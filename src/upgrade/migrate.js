@@ -21,7 +21,8 @@ export function migrateInto(adapter, root, dataByName) {
       continue
     }
     const { data, summary } = shapeMatch(dataByName[name], rules)
-    apply(adapter, root, rules, data)
+    // A row whose nested list is empty at that spot in v2 grows from the page's seeds, as a write does.
+    apply(adapter, root, rules, data, { templateAttr: 'cms-template' })
     byName[name] = summary
     totals.carriedOver += summary.carriedOver
     totals.discarded += summary.discarded
