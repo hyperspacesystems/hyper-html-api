@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en" visitor-drafts="blockeditor-v1" clay-mode-switch="live" clay-menu-roster opens-in="edit">
+<head>
+<meta charset="utf-8">
+<meta name="hyper-source" content="https://hyperclay.com/templates/blockeditor/hosted/latest.html">
+<meta name="hyper-version" content="1.0.0">
+<meta name="clay-template" content="blockeditor hosted">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sunday dinner</title>
+<meta name="application-name" content="Block editor">
+<meta name="description" content="Write a block-based document with headings, lists, tables, toggles, and boards, then download it as one HTML file to keep. Free, no sign-up." clay="no-copy">
+<link rel="canonical" href="https://blockeditor.hyperclay.com/" clay="no-copy">
+<meta property="og:type" content="website" clay="no-copy">
+<meta property="og:url" content="https://blockeditor.hyperclay.com/" clay="no-copy">
+<meta property="og:title" content="Shape your thoughts as you write" clay="no-copy">
+<meta property="og:description" content="First drafts rarely come out in order. Get your ideas down as they arrive, then rearrange them until the whole page reads clearly." clay="no-copy">
+<meta property="og:image" content="https://blockeditor.hyperclay.com/_/uploads/apps/blockeditor/og.png" clay="no-copy">
+<meta name="twitter:card" content="summary_large_image" clay="no-copy">
+<meta name="twitter:title" content="Shape your thoughts as you write" clay="no-copy">
+<meta name="twitter:description" content="First drafts rarely come out in order. Get your ideas down as they arrive, then rearrange them until the whole page reads clearly." clay="no-copy">
+<meta name="twitter:image" content="https://blockeditor.hyperclay.com/_/uploads/apps/blockeditor/og.png" clay="no-copy">
+<link rel="stylesheet" href="https://clayjs.com/v1/src/blockeditor/themes/light-1.css">
+<style>body { margin: 0 }</style>
+<script type="application/json" merge="blockeditor.tools" clay="live">{}</script>
+<script type="application/json" merge="blockeditor.settings" clay="live">{}</script>
+<meta name="theme-color" content="#F7F6F2">
+<link rel="icon" type="image/svg+xml" href="https://blockeditor.hyperclay.com/_/uploads/apps/blockeditor/favicon.svg" clay="no-copy">
+<link rel="icon" href="https://blockeditor.hyperclay.com/_/uploads/apps/blockeditor/favicon.ico" sizes="48x48" clay="no-copy">
+<link rel="apple-touch-icon" href="https://blockeditor.hyperclay.com/_/uploads/apps/blockeditor/apple-touch-icon.png" clay="no-copy">
+<script type="application/ld+json" clay="no-copy">{"@context":"https://schema.org","@type":"WebApplication","name":"Block editor","url":"https://blockeditor.hyperclay.com/","description":"A free block-based document editor with lists, tables, toggles, code, and boards that saves in your browser as you type and downloads as one HTML file.","applicationCategory":"UtilitiesApplication","operatingSystem":"Any","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}</script>
+<script>
+(() => {
+  const root = document.documentElement;
+  const blocks = [...document.head.querySelectorAll('style[clay-variant]')];
+  const named = (name) => blocks.find((style) => style.getAttribute('clay-variant') === name);
+  const saved = named(root.getAttribute('look'));
+  if (saved) for (const style of blocks) style === saved ? style.removeAttribute('media') : style.setAttribute('media', 'not all');
+  const slot = root.getAttribute('visitor-drafts');
+  if (!slot) return;
+  try {
+    const file = location.pathname.replace(/\/{2,}/g, '/').match(/^(.*?\/[^/]+\.(?:html|htmlclay))(?:\/|$)/i);
+    const path = file && file[1].toLowerCase() !== '/index.html' ? file[1] : '/';
+    const hinted = named(JSON.parse(localStorage.getItem(`clay:visitor-drafts:${slot}@${path}`))?.data?.look);
+    if (!hinted || hinted.getAttribute('media') !== 'not all') return;
+    const hint = document.createElement('style');
+    hint.setAttribute('clay', 'editor-ui');
+    hint.setAttribute('clay-look-hint', '');
+    hint.textContent = hinted.textContent;
+    document.head.append(hint);
+    setTimeout(() => hint.remove(), 4000);
+  } catch {}
+})();
+</script>
+<style clay-variant="look-1" clay-variant-label="Classic">
+:where(article[data-blockeditor], .blockeditor-shell) {
+  --chart-1: #9A5710;
+  --chart-2: #7A440A;
+  --chart-3: #5B5953;
+  --chart-4: #23221F;
+  --chart-5: #A1A09B;
+  --chart-6: #6B6862;
+  --chart-text: #23221F;
+  --blockeditor-bg: #F7F6F2;
+  --blockeditor-ink: #23221F;
+  --blockeditor-ink-strong: #23221F;
+  --blockeditor-ink-soft: #5B5953;
+  --blockeditor-ink-faint: #A1A09B;
+  --blockeditor-rule: rgba(35, 34, 31, 0.08);
+  --blockeditor-accent: #9A5710;
+  --blockeditor-link: #7A440A;
+  --blockeditor-caret: #9A5710;
+  --blockeditor-selection: rgba(154, 87, 16, 0.18);
+
+  --blockeditor-font: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --blockeditor-font-display: Newsreader, "Iowan Old Style", Georgia, serif;
+  --blockeditor-font-heading: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --blockeditor-font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --blockeditor-font-size: 17px;
+  --blockeditor-line-height: 1.65;
+  --blockeditor-measure: 632px;
+  --blockeditor-pad-top: 120px;
+  --blockeditor-h1-size: 40px;
+  --blockeditor-h1-weight: 500;
+  --blockeditor-h1-tracking: -0.01em;
+  --blockeditor-h1-line: 1.15;
+  --blockeditor-h2-size: 19px;
+  --blockeditor-h2-weight: 600;
+  --blockeditor-h3-size: 17px;
+  --blockeditor-h3-weight: 600;
+  --blockeditor-block-gap: 0.8em;
+  --blockeditor-indent: 26px;
+
+  --blockeditor-marker: #5B5953;
+  --blockeditor-check-size: 15px;
+  --blockeditor-check-radius: 4px;
+  --blockeditor-check-border: rgba(35, 34, 31, 0.30);
+  --blockeditor-check-fill: #5B5953;
+  --blockeditor-check-ink: #F7F6F2;
+  --blockeditor-done-ink: #5B5953;
+  --blockeditor-toggle-ink: #5B5953;
+  --blockeditor-callout-bg: rgba(35, 34, 31, 0.035);
+  --blockeditor-callout-line: transparent;
+  --blockeditor-code-bg: rgba(35, 34, 31, 0.045);
+  --blockeditor-code-ink: #23221F;
+
+  --blockeditor-chrome-ink-rest: rgba(35, 34, 31, 0.66);
+  --blockeditor-chrome-ink-moved: rgba(35, 34, 31, 0.80);
+  --blockeditor-chrome-bg-rest: rgba(35, 34, 31, 0.035);
+  --blockeditor-chrome-bg-moved: rgba(35, 34, 31, 0.06);
+  --blockeditor-chrome-line-rest: rgba(35, 34, 31, 0.22);
+  --blockeditor-chrome-line-moved: rgba(35, 34, 31, 0.36);
+  --blockeditor-chrome-shadow-rest: none;
+  --blockeditor-chrome-shadow-moved: none;
+  --blockeditor-chrome-radius: 7px;
+  --blockeditor-plus-size: 24px;
+  --blockeditor-fade: 250ms;
+
+  --blockeditor-pop-bg: #FBFAF7;
+  --blockeditor-pop-ink: #23221F;
+  --blockeditor-pop-muted: #5B5953;
+  --blockeditor-pop-line: rgba(35, 34, 31, 0.08);
+  --blockeditor-pop-shadow: 0 1px 2px rgba(35, 34, 31, 0.05), 0 8px 24px rgba(35, 34, 31, 0.07);
+  --blockeditor-pop-hover: rgba(35, 34, 31, 0.06);
+  --blockeditor-pop-radius: 12px;
+  --blockeditor-bar-bg: #F7F6F2;
+  --blockeditor-bar-ink: #5B5953;
+  --blockeditor-scrim: rgba(35, 34, 31, 0.10);
+
+  -webkit-font-smoothing: antialiased;
+}
+html, body { background: #F7F6F2; }
+:root { --sheet: #F7F6F2; --ink: #23221F; --ink-2: #5B5953; --line: rgba(35, 34, 31, 0.08); --hover: rgba(35, 34, 31, 0.06); --shadow: 0 1px 2px rgba(35, 34, 31, 0.05), 0 8px 24px rgba(35, 34, 31, 0.07); --accent: #9A5710; --sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, monospace; }
+</style>
+<style clay-variant="look-2" clay-variant-label="Typewriter" media="not all">
+@import url("https://clayjs.com/v1/fonts/ibm-plex.css");
+:where(article[data-blockeditor], .blockeditor-shell) {
+  --chart-1: #1E6271;
+  --chart-2: #0F3D47;
+  --chart-3: #5C5548;
+  --chart-4: #29251F;
+  --chart-5: #A39B8C;
+  --chart-6: #756D5F;
+  --chart-text: #29251F;
+  --blockeditor-bg: #F7F3E9;
+  --blockeditor-ink: #29251F;
+  --blockeditor-ink-strong: #1D1A15;
+  --blockeditor-ink-soft: #5C5548;
+  --blockeditor-ink-faint: #706858;
+  --blockeditor-rule: rgba(41, 37, 31, 0.13);
+  --blockeditor-accent: #1E6271;
+  --blockeditor-link: #174E5A;
+  --blockeditor-caret: #1F86A6;
+  --blockeditor-selection: rgba(31, 134, 166, 0.18);
+
+  --blockeditor-font: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --blockeditor-font-display: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --blockeditor-font-heading: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --blockeditor-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --blockeditor-font-size: 16px;
+  --blockeditor-line-height: 1.75;
+  --blockeditor-measure: 640px;
+  --blockeditor-pad-top: 104px;
+  --blockeditor-h1-size: 31px;
+  --blockeditor-h1-weight: 500;
+  --blockeditor-h1-tracking: -0.025em;
+  --blockeditor-h1-line: 1.25;
+  --blockeditor-h2-size: 18px;
+  --blockeditor-h2-weight: 600;
+  --blockeditor-h3-size: 16px;
+  --blockeditor-h3-weight: 600;
+  --blockeditor-block-gap: 0.9em;
+  --blockeditor-indent: 28px;
+
+  --blockeditor-marker: #5C5548;
+  --blockeditor-check-size: 15px;
+  --blockeditor-check-radius: 2px;
+  --blockeditor-check-border: rgba(41, 37, 31, 0.52);
+  --blockeditor-check-fill: #29251F;
+  --blockeditor-check-ink: #F7F3E9;
+  --blockeditor-done-ink: #706858;
+  --blockeditor-toggle-ink: #5C5548;
+  --blockeditor-callout-bg: rgba(41, 37, 31, 0.035);
+  --blockeditor-callout-line: rgba(41, 37, 31, 0.16);
+  --blockeditor-code-bg: rgba(41, 37, 31, 0.055);
+  --blockeditor-code-ink: #29251F;
+
+  --blockeditor-chrome-ink-rest: rgba(41, 37, 31, 0.66);
+  --blockeditor-chrome-ink-moved: rgba(41, 37, 31, 0.80);
+  --blockeditor-chrome-bg-rest: rgba(41, 37, 31, 0.025);
+  --blockeditor-chrome-bg-moved: rgba(41, 37, 31, 0.055);
+  --blockeditor-chrome-line-rest: rgba(41, 37, 31, 0.20);
+  --blockeditor-chrome-line-moved: rgba(41, 37, 31, 0.36);
+  --blockeditor-chrome-shadow-rest: none;
+  --blockeditor-chrome-shadow-moved: none;
+  --blockeditor-chrome-radius: 3px;
+  --blockeditor-plus-size: 24px;
+  --blockeditor-fade: 200ms;
+
+  --blockeditor-pop-bg: #FBF8F1;
+  --blockeditor-pop-ink: #29251F;
+  --blockeditor-pop-muted: #5C5548;
+  --blockeditor-pop-line: rgba(41, 37, 31, 0.16);
+  --blockeditor-pop-shadow: 0 1px 0 rgba(41, 37, 31, 0.05), 0 6px 20px rgba(41, 37, 31, 0.08);
+  --blockeditor-pop-hover: rgba(41, 37, 31, 0.06);
+  --blockeditor-pop-radius: 6px;
+  --blockeditor-bar-bg: #F7F3E9;
+  --blockeditor-bar-ink: #5C5548;
+  --blockeditor-scrim: rgba(41, 37, 31, 0.12);
+
+  -webkit-font-smoothing: antialiased;
+}
+html, body { background: #F7F3E9; }
+:root { --sheet: #F7F3E9; --ink: #29251F; --ink-2: #5C5548; --line: rgba(41, 37, 31, 0.16); --hover: rgba(41, 37, 31, 0.06); --shadow: 0 1px 0 rgba(41, 37, 31, 0.05), 0 6px 20px rgba(41, 37, 31, 0.08); --accent: #1E6271; --sans: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+</style>
+<style clay-variant="look-3" clay-variant-label="Bold" media="not all">
+@import url("https://clayjs.com/v1/fonts/work-sans.css");
+:where(article[data-blockeditor], .blockeditor-shell) {
+  --chart-1: #4A3DBF;
+  --chart-2: #8A82DA;
+  --chart-3: #4B5260;
+  --chart-4: #1B1E26;
+  --chart-5: #A3AAB6;
+  --chart-6: #2A2380;
+  --chart-text: #1B1E26;
+  --blockeditor-bg: #F2F4F7;
+  --blockeditor-ink: #1B1E26;
+  --blockeditor-ink-strong: #11141A;
+  --blockeditor-ink-soft: #4B5260;
+  --blockeditor-ink-faint: #656D7C;
+  --blockeditor-rule: rgba(27, 30, 38, 0.12);
+  --blockeditor-accent: #4A3DBF;
+  --blockeditor-link: #3A2EA6;
+  --blockeditor-caret: #4A3DBF;
+  --blockeditor-selection: rgba(74, 61, 191, 0.16);
+
+  --blockeditor-font: "Work Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --blockeditor-font-display: "Work Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --blockeditor-font-heading: "Work Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --blockeditor-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --blockeditor-font-size: 16.5px;
+  --blockeditor-line-height: 1.62;
+  --blockeditor-measure: 680px;
+  --blockeditor-pad-top: 96px;
+  --blockeditor-h1-size: 48px;
+  --blockeditor-h1-weight: 700;
+  --blockeditor-h1-tracking: -0.035em;
+  --blockeditor-h1-line: 1.08;
+  --blockeditor-h2-size: 23px;
+  --blockeditor-h2-weight: 650;
+  --blockeditor-h3-size: 18px;
+  --blockeditor-h3-weight: 600;
+  --blockeditor-block-gap: 0.75em;
+  --blockeditor-indent: 1.5em;
+
+  --blockeditor-marker: #4A3DBF;
+  --blockeditor-check-size: 17px;
+  --blockeditor-check-radius: 5px;
+  --blockeditor-check-border: rgba(27, 30, 38, 0.50);
+  --blockeditor-check-fill: #4A3DBF;
+  --blockeditor-check-ink: #F2F4F7;
+  --blockeditor-done-ink: #656D7C;
+  --blockeditor-toggle-ink: #4B5260;
+  --blockeditor-callout-bg: rgba(74, 61, 191, 0.07);
+  --blockeditor-callout-line: transparent;
+  --blockeditor-code-bg: rgba(27, 30, 38, 0.055);
+  --blockeditor-code-ink: #1B1E26;
+
+  --blockeditor-chrome-ink-rest: rgba(27, 30, 38, 0.66);
+  --blockeditor-chrome-ink-moved: rgba(27, 30, 38, 0.80);
+  --blockeditor-chrome-bg-rest: rgba(27, 30, 38, 0.035);
+  --blockeditor-chrome-bg-moved: rgba(27, 30, 38, 0.07);
+  --blockeditor-chrome-line-rest: rgba(27, 30, 38, 0.16);
+  --blockeditor-chrome-line-moved: rgba(27, 30, 38, 0.30);
+  --blockeditor-chrome-shadow-rest: none;
+  --blockeditor-chrome-shadow-moved: 0 1px 3px rgba(17, 20, 26, 0.10);
+  --blockeditor-chrome-radius: 10px;
+  --blockeditor-plus-size: 26px;
+  --blockeditor-fade: 160ms;
+
+  --blockeditor-pop-bg: #FAFBFC;
+  --blockeditor-pop-ink: #1B1E26;
+  --blockeditor-pop-muted: #4B5260;
+  --blockeditor-pop-line: rgba(27, 30, 38, 0.10);
+  --blockeditor-pop-shadow: 0 1px 2px rgba(17, 20, 26, 0.06), 0 14px 36px -8px rgba(17, 20, 26, 0.18);
+  --blockeditor-pop-hover: rgba(74, 61, 191, 0.08);
+  --blockeditor-pop-radius: 14px;
+  --blockeditor-bar-bg: #F2F4F7;
+  --blockeditor-bar-ink: #4B5260;
+  --blockeditor-scrim: rgba(17, 20, 26, 0.18);
+
+  -webkit-font-smoothing: antialiased;
+}
+html, body { background: #F2F4F7; }
+:root { --sheet: #F2F4F7; --ink: #1B1E26; --ink-2: #4B5260; --line: rgba(27, 30, 38, 0.12); --hover: rgba(27, 30, 38, 0.06); --shadow: 0 1px 2px rgba(27, 30, 38, 0.06), 0 10px 24px rgba(27, 30, 38, 0.08); --accent: #4A3DBF; --sans: "Work Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+</style>
+<style clay-menu-skin="1" media="not all">
+[part~="dock"] { --bevel-surface: var(--sheet); --bevel-sunk: var(--hover); --bevel-ink: var(--ink); --bevel-ink-2: var(--ink-2); --bevel-muted: var(--ink-2); --bevel-faint: var(--ink-2); --bevel-line: var(--line); --bevel-line-2: var(--line-2); --bevel-line-3: var(--line-2); --bevel-brass: var(--accent); --bevel-font-sans: var(--sans); --bevel-font-mono: var(--mono); --clay-shadow: var(--shadow); }
+[part~="button"] { width: 32px; height: 32px; border: 0; border-radius: 6px; background: none; color: var(--ink-2); }
+[part~="button"]:hover, [part~="button"][aria-expanded="true"] { color: var(--ink); background: var(--hover); }
+[part~="button"] svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.1; stroke-linecap: square; stroke-linejoin: miter; }
+[part~="list"] { width: 270px; padding: 5px; background: var(--sheet); border: 1px solid var(--line-2); border-radius: 8px; box-shadow: var(--shadow); }
+[part~="item"], [part~="dismiss"], [part~="text"] { min-height: 30px; padding: 7px 9px; border-radius: 5px; font: 400 13px/1.3 var(--sans); color: var(--ink); }
+[part~="item"] kbd { padding-left: 14px; font: 400 11px/1 var(--mono); color: var(--ink-2); }
+[part~="quiet"] { font-size: 11.5px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 2px; }
+[part~="dismiss"] { color: var(--ink-2); }
+[part~="dismiss"]:hover { color: var(--ink); }
+[part~="separator"] { height: 1px; margin: 5px 4px; background: var(--line); }
+@media (max-width: 759px) { [part~="button"] { width: 44px; height: 44px; } }
+</style>
+<style>
+:root { --line-2: color-mix(in oklab, var(--line) 70%, var(--ink)); --paper-fill: color-mix(in oklab, var(--sheet) 94%, var(--ink)); }
+body { margin: 0; color: var(--ink); font: 16px/1.5 var(--sans); }
+.page-head { position: sticky; top: 0; z-index: 30; display: flex; justify-content: flex-end; align-items: center; min-height: 44px; padding: 0 12px; pointer-events: none; }
+.page-head > * { pointer-events: auto; }
+html { scroll-padding-top: 52px; }
+article[data-blockeditor] { max-width: 100%; overflow-x: auto; }
+</style>
+<style>@media (scripting: none) { [clay-menu-slot], .blockeditor-dock, .blockeditor-plus, .blockeditor-grip, [visitor-intro] { display: none !important; } }</style>
+<script type="application/json" data-rules-name="api" data-rules-version="1">{"look":"html@look","thanks":["a[clay-menu-item]",{"id":"@data-id"}]}</script>
+<script src="https://signal.hyperclay.com/v1.js" defer clay="no-copy" data-profile="document" data-wait data-start="interaction"></script>
+</head>
+<body>
+<div class="doc-links" hidden>
+<a cms-template data-id="" clay-menu-item clay-menu-section="end" clay-menu-quiet clay-menu-dismiss="Remove this suggestion" href="mailto:david@hyperclay.com?subject=Block%20editor">Send an appreciation email to the creator of this file</a>
+<a data-id="appreciation" clay-menu-item clay-menu-section="end" clay-menu-quiet clay-menu-dismiss="Remove this suggestion" href="mailto:david@hyperclay.com?subject=Block%20editor">Send an appreciation email to the creator of this file</a>
+</div>
+<header class="page-head"><div clay-menu-slot clay-menu-looks no-edit-switch clay-menu-label="Settings"></div></header>
+<article class="blockeditor" clay="freeze" data-blockeditor="1" data-rev="1a59f2589debbc66"><h1 data-id="title">Sunday dinner</h1>
+<p data-id="p1">Six friends are coming <strong>this Sunday at six</strong> for supper on the porch. Keep things simple and <em>finish prep early</em>.</p>
+<h2 data-id="h21">Menu</h2>
+<ul><li data-id="li1">Roast chicken with lemon and herbs.</li><li data-id="li2">Crispy potatoes with sea salt.</li><li data-id="li3">Green salad with toasted walnuts.</li><li data-id="li4">Warm peach crisp with cream.</li></ul>
+<h2 data-id="h22">Before guests arrive</h2>
+<ul><li data-id="li5"><input type="checkbox" disabled="" checked="">Wipe the porch table</li><li data-id="li6"><input type="checkbox" disabled="">Set extra chairs on the porch</li><li data-id="li7"><input type="checkbox" disabled="">Fill two water pitchers</li><li data-id="li8"><input type="checkbox" disabled="">Light the patio lanterns</li></ul>
+<aside data-id="callout" class="blockeditor-callout">🍋 Salt the chicken an hour early so the skin roasts crisp.</aside>
+<ol><li data-id="li9">3:30 pm: Salt the chicken and leave it out.</li><li data-id="li10">4:30 pm: Roast the chicken and potatoes.</li><li data-id="li11">5:15 pm: Assemble the peach crisp.</li><li data-id="li12">5:45 pm: Rest the chicken, bake the crisp.</li></ol>
+<table data-id="table1" aria-label="Table">
+<thead><tr><th data-col="table1-c1" id="table1-table1-c1" scope="col">Item</th><th data-col="table1-c2" id="table1-table1-c2" scope="col">Amount</th><th data-col="table1-c3" id="table1-table1-c3" scope="col">Where</th></tr></thead>
+<tbody>
+<tr data-id="table1-r1"><td headers="table1-table1-c1">Whole chicken</td><td headers="table1-table1-c2">4 lb</td><td headers="table1-table1-c3">Elm Butcher</td></tr>
+<tr data-id="table1-r2"><td headers="table1-table1-c1">Yellow peaches</td><td headers="table1-table1-c2">6 ripe</td><td headers="table1-table1-c3">Farmers market</td></tr>
+<tr data-id="table1-r3"><td headers="table1-table1-c1">Baby greens</td><td headers="table1-table1-c2">2 bags</td><td headers="table1-table1-c3">Farmers market</td></tr>
+<tr data-id="table1-r4"><td headers="table1-table1-c1">Heavy cream</td><td headers="table1-table1-c2">1 pint</td><td headers="table1-table1-c3">Corner store</td></tr>
+</tbody>
+</table>
+<details data-id="toggle"><summary>Peach crisp</summary>
+<p data-id="toggle-1">Toss sliced peaches with lemon juice and sugar.</p>
+<p data-id="toggle-2">Cover with oats, flour, brown sugar, and butter.</p>
+<p data-id="toggle-3">Bake at 375 degrees until golden.</p>
+</details>
+<blockquote data-id="quote1">"Nobody cares if the chairs match," Mom always says.</blockquote>
+<section data-id="board" data-type="board">
+<div data-col="col-to-buy"><h4>To buy</h4><ul><li data-id="card-peaches">Yellow peaches</li><li data-id="card-cream">Heavy cream</li></ul></div>
+<div data-col="col-fridge"><h4>In the fridge</h4><ul><li data-id="card-chicken">Whole chicken</li><li data-id="card-greens">Baby greens</li></ul></div>
+<div data-col="col-ready"><h4>Ready</h4><ul><li data-id="card-walnuts">Toasted walnuts</li><li data-id="card-napkins">Linen napkins</li></ul></div>
+</section>
+<hr data-id="divider1">
+<p data-id="p2">Type <code>/</code> on a new line to add any block, or drag the handle at the left of a block to move it. The page stays in this browser until you download it.</p></article>
+<template owned-article><article class="blockeditor" clay="freeze" data-blockeditor="1" data-rev="093360993130d818"><h1 data-id="title"></h1>
+<p data-id="p1"></p></article></template>
+<script src="https://clayjs.com/v1/clay.js?plugins=blockeditor,visitor-drafts,visitor-menu,menu,indicator"></script>
+<template visitor-intro="manual" clay="no-copy">
+<div class="strip-page">
+<style>
+.strip-page {
+  --p-paper: #F0EEE7;
+  --p-bar: #E7E4DC;
+  --p-edge: #D6D3C9;
+  --p-sheet: #FBFAF7;
+  --p-ink-strong: #1A1916;
+  --p-ink: #23221F;
+  --p-ink-soft: #5B5953;
+  --p-ink-quiet: #6B6862;
+  --p-ink-faint: #A1A09B;
+  --p-accent: #9A5710;
+  --p-accent-deep: #7A440A;
+  --p-accent-soft: #F5E6CF;
+  --p-accent-line: #E8CDA6;
+  --p-chrome: rgba(35, 34, 31, 0.42);
+  --p-chrome-on: rgba(35, 34, 31, 0.62);
+  --p-chrome-line: rgba(35, 34, 31, 0.22);
+  --p-chrome-bg: rgba(35, 34, 31, 0.035);
+  --p-select: rgba(154, 87, 16, 0.12);
+  --p-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --p-serif: Newsreader, "Iowan Old Style", Georgia, serif;
+  container-type: inline-size;
+  position: relative;
+  display: block;
+  color: var(--p-ink);
+  background: var(--p-paper);
+  border-bottom: 1px solid var(--p-edge);
+  font-family: var(--p-sans);
+  text-align: left;
+  -webkit-font-smoothing: antialiased;
+}
+.strip-page *, .strip-page *::before, .strip-page *::after { box-sizing: border-box; }
+.strip-page .pg-inner { width: 1024px; max-width: 100%; margin: 0 auto; }
+.strip-page .pg-band { padding: 7px 0 8px; }
+.strip-page .pg-top { margin: 0 0 7px; padding-right: 124px; }
+.strip-page .pg-notice {
+  margin: 0; padding: 3px 10px; border-radius: 6px;
+  background: var(--p-accent-soft); color: var(--p-ink-soft);
+  font-size: 12px; line-height: 1.35;
+}
+.strip-page .pg-notice a {
+  color: var(--p-accent-deep); font-weight: 600; text-decoration: underline;
+  text-decoration-color: rgba(22, 69, 131, 0.32); text-underline-offset: 2px;
+}
+.strip-page .pg-hero { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 48px; align-items: center; }
+.strip-page .pg-copy { max-width: 444px; }
+.strip-page .pg-headline {
+  margin: 0 0 11px; font-family: var(--p-serif); font-size: 32px; font-weight: 500;
+  line-height: 1.13; letter-spacing: -0.015em; color: var(--p-ink-strong); text-wrap: balance;
+}
+.strip-page .pg-body { margin: 0; font-size: 15px; line-height: 1.54; color: var(--p-ink-soft); text-wrap: pretty; }
+.strip-page .pg-plate { position: relative; justify-self: end; width: 100%; max-width: 520px; }
+
+.strip-page .bk-stage {
+  position: relative; width: 520px; height: 240px; transform-origin: 0 0;
+  font-family: var(--p-sans); color: var(--p-ink); text-align: left;
+}
+.strip-page .bk-stage svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.strip-page .bk-stage:not([data-uimotion]) .later { visibility: hidden; }
+.strip-page .bk-well { position: absolute; inset: 0; border: 1px solid var(--p-edge); border-radius: 10px; background: var(--p-bar); }
+.strip-page .bk-sheet {
+  position: absolute; left: 16px; right: 16px; top: 12px; bottom: 12px; overflow: hidden;
+  border: 1px solid var(--p-edge); border-radius: 8px; background: var(--p-sheet);
+  box-shadow: 0 1px 2px rgba(35, 34, 31, 0.05), 0 14px 30px -14px rgba(35, 34, 31, 0.22);
+}
+.strip-page .bk-dock {
+  position: absolute; top: 9px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 1px; height: 22px; padding: 2px 3px;
+  border: 1px solid rgba(35, 34, 31, 0.20); border-radius: 7px; background: var(--p-sheet); color: var(--p-chrome);
+}
+.strip-page .bk-turn { padding: 0 5px; font: 500 8.5px/16px var(--p-sans); white-space: nowrap; }
+.strip-page .bk-turn svg { display: inline-block; width: 6px; height: 6px; margin-left: 2px; vertical-align: -1px; }
+.strip-page .bk-sep { width: 1px; height: 9px; margin: 0 2px; background: currentColor; opacity: 0.5; }
+.strip-page .bk-tool { display: grid; place-items: center; width: 17px; height: 16px; }
+.strip-page .bk-tool svg { width: 9px; height: 9px; }
+.strip-page .bk-doc { position: absolute; top: 41px; left: 70px; right: 70px; }
+.strip-page .bk-title { margin: 0 0 8px; font: 500 22px/26px var(--p-serif); letter-spacing: -0.01em; color: var(--p-ink); }
+.strip-page .bk-h { font: 600 11.5px/17px var(--p-sans); color: var(--p-ink); }
+.strip-page .bk-h.is-second { margin-top: 7px; }
+.strip-page .bk-p { margin: 0; font: 400 11.5px/17px var(--p-sans); color: var(--p-ink); }
+.strip-page .bk-li { display: flex; align-items: center; gap: 6px; font: 400 11.5px/17px var(--p-sans); color: var(--p-ink); }
+.strip-page .bk-li b {
+  display: grid; place-items: center; flex: none; width: 9px; height: 9px; margin-left: 3px;
+  border: 1.2px solid rgba(35, 34, 31, 0.30); border-radius: 2.5px;
+}
+.strip-page .bk-li.is-done b { background: var(--p-ink-soft); border-color: var(--p-ink-soft); }
+.strip-page .bk-li.is-done b svg { width: 7px; height: 7px; stroke: var(--p-sheet); stroke-width: 1.4; }
+.strip-page .bk-new {
+  position: relative; height: 17px; margin-top: 8px;
+  font: 400 11.5px/17px var(--p-sans); color: var(--p-ink); white-space: nowrap;
+}
+.strip-page .bk-tint { position: absolute; inset: -2px -6px; border-radius: 4px; background: var(--p-select); opacity: 0; }
+.strip-page .bk-ph { position: absolute; left: 0; top: 0; color: var(--p-ink-faint); }
+.strip-page .bk-ch { opacity: 0; }
+.strip-page .bk-drop {
+  position: absolute; left: 0; right: 0; top: 0; height: 2px; margin-top: -1px;
+  border-radius: 1px; background: var(--p-accent); opacity: 0;
+}
+.strip-page .bk-chrome { position: absolute; left: 0; top: 151px; width: 100%; height: 17px; }
+.strip-page .bk-plus {
+  position: absolute; top: 0.5px; left: -22px; display: grid; place-items: center; width: 16px; height: 16px;
+  border: 1px solid var(--p-chrome-line); border-radius: 5px; background: var(--p-chrome-bg); color: var(--p-chrome);
+}
+.strip-page .bk-plus svg { width: 8px; height: 8px; }
+.strip-page .bk-grip {
+  position: absolute; top: 0.5px; left: -40px; display: grid; place-items: center;
+  width: 16px; height: 16px; color: var(--p-chrome-on); opacity: 0;
+}
+.strip-page .bk-grip svg { width: 11px; height: 11px; stroke-width: 2.2; }
+.strip-page .bk-caret {
+  position: absolute; left: 0; top: 2px; width: 1.5px; height: 13px; border-radius: 1px;
+  background: var(--p-accent); animation: bk-blink 1.06s steps(1, end) infinite;
+}
+@keyframes bk-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+.strip-page .pg-foot { background: var(--p-bar); padding: 6px 0 7px; }
+.strip-page .pg-meta { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.strip-page .pg-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.strip-page .pg-tags li {
+  padding: 2.5px 9px; border-radius: 6px; border: 1px solid var(--p-accent-line);
+  background: var(--p-accent-soft); color: var(--p-accent-deep); font-size: 12px; font-weight: 500; line-height: 1.2;
+}
+.strip-page .pg-cue {
+  flex: none; display: inline-flex; align-items: center; gap: 5px; margin: 0;
+  color: var(--p-ink-soft); font-size: 12.5px; font-weight: 500; line-height: 1.2; text-decoration: none;
+}
+.strip-page .pg-cue svg { display: block; width: 13px; height: 13px; color: var(--p-accent); }
+.strip-page .pg-cue:hover { color: var(--p-ink); }
+
+@container (max-width: 640px) {
+  .strip-page .pg-inner { padding: 0 16px; }
+  .strip-page .pg-band { padding: 12px 0 14px; }
+  .strip-page .pg-top { margin-bottom: 14px; padding-right: 0; padding-top: 44px; }
+  .strip-page .pg-notice { font-size: 11.5px; line-height: 1.42; padding: 6px 9px; }
+  .strip-page .pg-hero { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .strip-page .pg-copy { max-width: none; }
+  .strip-page .pg-headline { font-size: 26px; line-height: 1.15; margin-bottom: 8px; }
+  .strip-page .pg-body { font-size: 14.5px; line-height: 1.5; }
+  .strip-page .pg-plate { justify-self: stretch; }
+  .strip-page .pg-foot { padding: 12px 0 13px; }
+  .strip-page .pg-meta { flex-direction: column; align-items: flex-start; gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .strip-page .bk-caret { animation: none; }
+}
+@media print { .strip-page { display: none; } }
+</style>
+<div class="pg-band">
+  <div class="pg-inner">
+    <div class="pg-top">
+      <p class="pg-notice">Part of <a href="https://onehtmlfile.com" target="_blank" rel="noopener">Starter apps</a>, our collection of free apps, each in one HTML file. A new release every two weeks.</p>
+    </div>
+    <div class="pg-hero">
+      <div class="pg-copy">
+        <h1 class="pg-headline">Shape your thoughts as you write.</h1>
+        <p class="pg-body">First drafts rarely come out in order. Get your ideas down as they arrive, then rearrange them until the whole page reads clearly.</p>
+      </div>
+      <div class="pg-plate">
+        <div class="bk-stage" aria-hidden="true">
+          <div class="bk-well"></div>
+          <div class="bk-sheet">
+            <div class="bk-dock">
+              <span class="bk-turn">Text<svg viewBox="0 0 8 8"><path d="M2 3.2 4 5.2 6 3.2"/></svg></span>
+              <span class="bk-sep"></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M5 3h4a2.5 2.5 0 0 1 0 5H5zM5 8h4.6a2.5 2.5 0 0 1 0 5H5z"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M10 3H6.5M9.5 13H6M9 3l-2 10"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M3 8h10M10.8 5.2C10.5 4 9.4 3.2 8 3.2c-1.7 0-2.8.9-2.8 2.1M5.2 10.8c.3 1.2 1.4 2 2.8 2 1.7 0 2.8-.9 2.8-2.1"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M7 9a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 9 3.5l-.7.7M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.7-.7"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M6.5 4.5h7M6.5 8h7M6.5 11.5h7"/><path stroke-width="2.4" d="M3 4.5h.01M3 8h.01M3 11.5h.01"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M7 4.5h6.5M7 8h6.5M7 11.5h6.5M2.5 3.5l1-.5v3M2.5 9.3c.2-.5.6-.8 1.1-.8.6 0 1 .4 1 .9 0 .9-2.1 1.4-2.1 2.6h2.1"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.5 8.2l1.8 1.8 3.4-4"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path d="M6 4.5 2.5 8 6 11.5M10 4.5 13.5 8 10 11.5"/></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><g transform="scale(0.6667)" stroke-width="2.25"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></g></svg></span>
+              <span class="bk-tool"><svg viewBox="0 0 16 16"><path stroke-width="2.2" d="M3 8h.01M8 8h.01M13 8h.01"/></svg></span>
+            </div>
+            <div class="bk-doc">
+              <div class="bk-title">Sunday dinner</div>
+              <div class="bk-h">Menu</div>
+              <div class="bk-p">Roast chicken with lemon and herbs.</div>
+              <div class="bk-p">Green salad with toasted walnuts.</div>
+              <div class="bk-before">
+                <div class="bk-h is-second">Before guests arrive</div>
+                <div class="bk-li is-done"><b><svg viewBox="0 0 9 9"><path d="M2.1 4.7l1.6 1.6 3.2-3.4"/></svg></b>Set extra chairs on the porch</div>
+                <div class="bk-li bk-light"><b></b>Light the patio lanterns</div>
+              </div>
+              <div class="bk-new">
+                <span class="bk-tint later"></span>
+                <span class="bk-ph">Type / for blocks</span>
+                <span class="bk-text"></span>
+              </div>
+              <span class="bk-drop later"></span>
+              <div class="bk-chrome">
+                <span class="bk-plus"><svg viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></svg></span>
+                <span class="bk-grip later"><svg viewBox="0 0 16 16"><path stroke-width="2.2" d="M6 3.5h.01M10 3.5h.01M6 8h.01M10 8h.01M6 12.5h.01M10 12.5h.01"/></svg></span>
+                <span class="bk-caret"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="pg-foot">
+  <div class="pg-inner">
+    <div class="pg-meta">
+      <ul class="pg-tags" aria-label="Key facts">
+        <li>Free</li>
+        <li>No sign-up</li>
+        <li>Saves as you type</li>
+        <li>Lists, tables, boards</li>
+        <li>Import and export</li>
+      </ul>
+      <a class="pg-cue" href="#" visitor-intro-start>Start writing below <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2.5v8.5M3.7 7.8L7 11.2l3.3-3.4"/></svg></a>
+    </div>
+  </div>
+</div>
+<script type="module">
+const BLOCK_TEXT = 'Serve warm peach crisp.'
+
+function bkFit(stage) {
+  const wrap = stage.parentElement
+  const k = Math.min(1, wrap.clientWidth / 520)
+  stage.style.transform = `scale(${k})`
+  wrap.style.height = `${240 * k}px`
+}
+
+function bkScene(stage, { scene }) {
+  const $ = (sel) => stage.querySelector(sel)
+  const text = $('.bk-text')
+  let chars = [...text.querySelectorAll('.bk-ch')]
+  if (chars.length !== BLOCK_TEXT.length) {
+    text.replaceChildren()
+    chars = [...BLOCK_TEXT].map((ch) => {
+      const span = stage.ownerDocument.createElement('span')
+      span.className = 'bk-ch'
+      span.textContent = ch
+      text.append(span)
+      return span
+    })
+  }
+  const before = $('.bk-before')
+  const moved = $('.bk-new')
+  const chrome = $('.bk-chrome')
+  const caret = $('.bk-caret')
+  const drop = $('.bk-drop')
+  const lift = before.offsetTop - moved.offsetTop
+  const line = $('.bk-light').offsetHeight
+  const rest = [stage.clientWidth * 0.76, stage.clientHeight * 0.87]
+  const bottom = moved.offsetTop - 2
+  const hop = $('.bk-light').offsetTop - 2
+  const target = before.offsetTop - 2
+  const caretAt = (i) => (i < 0 ? 0 : chars[i].offsetLeft + chars[i].offsetWidth)
+
+  chrome.style.top = `${moved.offsetTop}px`
+
+  const s = scene(stage, { cursor: rest, still: 4450 })
+  const cursor = s.cursorEl()
+  Object.assign(cursor.style, { color: 'var(--p-ink)', filter: 'drop-shadow(0 2px 2px rgba(35, 34, 31, 0.18))' })
+
+  s.set('.bk-drop', { opacity: 0, translate: [0, bottom] })
+  s.at(1000).tween('.bk-ph', 'opacity', 0, { from: 1, duration: 120, ease: 'linear' })
+  s.with(0).tween(chars, 'opacity', 1, { from: 0, duration: 1, stagger: 75, ease: 'linear' })
+  chars.forEach((_, i) => {
+    s.at(1000 + i * 75).tween(caret, 'translate', [caretAt(i), 0], { from: [caretAt(i - 1), 0], duration: 1, ease: 'linear' })
+  })
+  s.at(3250).tween('.bk-grip', 'opacity', 1, { from: 0, duration: 200, ease: 'linear' })
+  s.at(3400).move('.bk-grip', { offset: [0.5, 0.55], duration: 520 })
+  s.at(4000).press('.bk-grip', { scale: 1.14, up: 110, down: 110 })
+  s.with(0).tween('.bk-tint', 'opacity', 1, { from: 0, duration: 170, ease: 'linear' })
+  s.at(4130).tween(moved, 'opacity', 0.55, { duration: 240, ease: 'linear' })
+  s.at(4520).tween(drop, 'opacity', 1, { from: 0, duration: 140, ease: 'linear' })
+  s.at(4720).tween(drop, 'translate', [0, hop], { duration: 150 })
+  s.at(4750).move(drop, { offset: [0.04, 0.5], duration: 380 })
+  s.at(5150).tween(drop, 'translate', [0, target], { duration: 170 })
+  s.at(5200).move(drop, { offset: [0.04, 0.5], duration: 420 })
+  s.at(6300).tween(drop, 'opacity', 0, { duration: 150, ease: 'linear' })
+  s.with(0).tween(moved, 'translate', [0, lift], { duration: 360, ease: 'out' })
+  s.with(0).tween(before, 'translate', [0, line], { duration: 360, ease: 'out' })
+  s.with(0).tween(caret, 'translate', [0, 0], { duration: 300, ease: 'linear' })
+  s.at(6900).tween('.bk-tint', 'opacity', 0, { duration: 400, ease: 'linear' })
+  s.with(0).tween(moved, 'opacity', 1, { duration: 400, ease: 'linear' })
+  s.at(7000).tween('.bk-grip', 'opacity', 0, { duration: 250, ease: 'linear' })
+  s.at(9300).tween(moved, 'opacity', 0, { duration: 300, ease: 'linear' })
+  s.with(0).move(rest, { duration: 640 })
+  s.at(9600).tween(chars, 'opacity', 0, { duration: 0, ease: 'linear' })
+  s.with(0).tween(moved, 'translate', [0, 0], { duration: 0, ease: 'linear' })
+  s.with(0).tween(drop, 'translate', [0, bottom], { duration: 0, ease: 'linear' })
+  s.with(0).tween(moved, 'opacity', 1, { duration: 0, ease: 'linear' })
+  s.at(9620).tween(before, 'translate', [0, 0], { duration: 400, ease: 'out' })
+  s.at(9900).tween('.bk-ph', 'opacity', 1, { duration: 220, ease: 'linear' })
+  s.at(10260).reset({ duration: 240 })
+  return s
+}
+
+const stages = [...document.querySelectorAll('.strip-page .bk-stage')]
+if (stages.length && window.clay?.assets) {
+  window.clay.assets.load('uimotion').then((u) => {
+    const bound = (window.bkStages ??= new WeakSet())
+    const debug = new URLSearchParams(location.search).has('debug')
+    for (const stage of stages) {
+      if (bound.has(stage)) continue
+      bound.add(stage)
+      const fit = () => bkFit(stage)
+      fit()
+      new ResizeObserver(fit).observe(stage.parentElement)
+      u.mount(stage, (el) => bkScene(el, u), { debug })
+    }
+  }, (error) => console.warn('page: the intro animation did not load', error))
+}
+</script>
+</div>
+</template>
+<template data-hyperclay-bar><style>
+.bar { --t-bg: #F7F6F2; --t-ink: #23221F; --t-line: rgba(35, 34, 31, 0.08); --t-accent: #2F5E9E;
+  background: var(--t-bg); color: var(--t-ink); font: 13.5px/1.45 system-ui, sans-serif; }
+@media (prefers-color-scheme: dark) { .bar { --t-bg: #1c2126; --t-ink: #d9ddd5; --t-line: #2a3137; --t-accent: #ef7650; } }
+.bar[data-kind="trial"] { border-top: 1px solid var(--t-line); }
+.bar[data-kind="temp"] { border-bottom: 1px solid var(--t-line); }
+.btn { border: 1px solid var(--t-line); background: transparent; color: var(--t-ink); }
+.primary { background: var(--t-accent); border-color: var(--t-accent); color: var(--t-bg); }
+</style></template>
+</body>
+</html>

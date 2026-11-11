@@ -5,7 +5,7 @@ import { NoRulesTag, RulesParseError } from './engine/errors.js'
 import { parseRelaxed } from './engine/rules.js'
 import { writeDocument } from './write.js'
 
-const PAGE = /^page(?:\.[0-9]+)?$/
+const PAGE = /^blockeditor(?:\.[0-9]+)?$/
 const TEXT = new Set(['paragraph', 'heading', 'list_item', 'callout', 'code_block', 'toggle'])
 const MARKS = ['b', 'i', 's', 'c', 'a']
 
@@ -21,10 +21,19 @@ function refuse(message) {
   throw new PageWriteRefused('invalid-content', message)
 }
 
+// Inert content (a starter article kept in a <template>) is not part of the page, as in a browser.
+// Cheerio parents a template's content under a root node, which closest() does not climb past.
+function live(_, node) {
+  for (let up = node.parent; up; up = up.parent) {
+    if (up.type === 'tag' && (up.name === 'template' || up.name === 'noscript')) return false
+  }
+  return true
+}
+
 function pageNodes($) {
-  const tags = $('script[merge][clay~="live"]').filter((_, node) => PAGE.test($(node).attr('merge')))
+  const tags = $('script[merge][clay~="live"]').filter((_, node) => PAGE.test($(node).attr('merge'))).filter(live)
   if (!tags.length) return null
-  const articles = $('article[data-page]')
+  const articles = $('article[data-blockeditor]').filter(live)
   if (tags.length !== 1 || articles.length !== 1) refuse('Expected one page store and one page article')
   return { tag: tags[0], article: articles[0] }
 }
@@ -316,8 +325,9 @@ export async function writePageDocument(load, html, data, options = {}) {
   const next$ = load(candidate.html, { sourceCodeLocationInfo: true })
   const nextNodes = pageNodes(next$)
   const aligned$ = load(aligned)
-  const changes = pageChanges(next$, nextNodes.article, aligned$, aligned$('article[data-page]')[0], page.blocks, before.model, projection)
-  const unchangedAttrs = canon(next$(nextNodes.article).attr()) === canon(aligned$('article[data-page]').attr())
+  const alignedArticle = pageNodes(aligned$).article
+  const changes = pageChanges(next$, nextNodes.article, aligned$, alignedArticle, page.blocks, before.model, projection)
+  const unchangedAttrs = canon(next$(nextNodes.article).attr()) === canon(aligned$(alignedArticle).attr())
   const proposed = projectionOf(load, proposedBlocks(page.blocks, changes), projection)
   if (!unchangedAttrs || !sameArticle(next$, nextNodes.article, proposed)) {
     refuse('The article edit cannot be represented in the page store')
