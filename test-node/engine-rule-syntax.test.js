@@ -61,3 +61,23 @@ test('a mailto selector with a real prop part still splits at the prop', () => {
     to: 'mailto:hello@michaellai.au',
   })
 })
+
+test('splitRule takes a trailing [*] out of the selector and reports all', () => {
+  assert.deepEqual(splitRule('.site-name[*]'), { selector: '.site-name', prop: null, all: true })
+  assert.equal(splitRule('.site-name').all, undefined)
+})
+
+test('splitRule finds a [*] marker before a prop part', () => {
+  assert.deepEqual(splitRule('a.home[*]@href'), { selector: 'a.home', prop: 'href', all: true })
+  assert.deepEqual(splitRule('@href'), { selector: '', prop: 'href' })
+})
+
+test('a [*] rule writes every match of a selector that carries an @', () => {
+  const $ = cheerio.load(`<div id="root">
+  <a href="mailto:hi@example.com"><span class="btn-label">A</span></a>
+  <a href="mailto:hi@example.com"><span class="btn-label">B</span></a>
+</div>`)
+  const rules = { emailBtn: 'a[href="mailto:hi@example.com"] .btn-label[*]' }
+  apply(cheerioAdapter, $('#root'), rules, { emailBtn: 'Email me' })
+  assert.deepEqual($('.btn-label').map((_, el) => $(el).text()).get(), ['Email me', 'Email me'])
+})

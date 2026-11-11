@@ -1,4 +1,4 @@
-import { ruleAttrIndex } from './rule-syntax.js'
+import { splitRule } from './rule-syntax.js'
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -34,8 +34,7 @@ export function planWrite(adapter, root, rules, data, opts = {}) {
     if (value === undefined) return
     if (typeof rule === 'string') {
       if (rule.endsWith('[]') || rule === '.' || rule.startsWith('@')) return
-      const at = ruleAttrIndex(rule)
-      const selector = at === -1 ? rule : rule.slice(0, at)
+      const { selector } = splitRule(rule)
       if (!selector) return
       if (adapter.find(ctx, selector, opts).length === 0) unmatched.push({ path: label(path), selector })
       return

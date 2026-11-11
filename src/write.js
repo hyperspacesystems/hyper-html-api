@@ -46,7 +46,7 @@ export function writeDocument(load, src, data, options = {}) {
   // pays for the field it wrote, not for every rule in the document.
   const written = writtenRules(rules, data)
   const writtenRoot = load(html).root()
-  assertRoundTrip(written, data, extract(cheerioAdapter, writtenRoot, written, opts))
+  assertRoundTrip(written, data, extract(cheerioAdapter, writtenRoot, written, { ...opts, allMatches: true }))
   return { html, changed: html !== src, spliced }
 }
 

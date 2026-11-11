@@ -10,7 +10,7 @@ import {
   ShapeMismatch,
 } from './errors.js'
 import { listDiff } from './diff.js'
-import { ruleAttrIndex } from './rule-syntax.js'
+import { ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName, setStyleVar } from './style-vars.js'
 
 export function apply(adapter, root, rules, data, opts = {}) {
@@ -70,11 +70,10 @@ function applyScalar(adapter, ctx, rule, value, trace, opts) {
 
   const at = ruleAttrIndex(rule)
   if (at !== -1) {
-    const selector = rule.slice(0, at)
+    const { selector, all } = splitRule(rule)
     const name = rule.slice(at + 1)
     const matches = selector ? adapter.find(ctx, selector, opts) : [ctx]
-    if (matches.length === 0) return ctx
-    writePropOrAttr(adapter, matches[0], name, value)
+    for (const node of all ? matches : matches.slice(0, 1)) writePropOrAttr(adapter, node, name, value)
     return ctx
   }
 
@@ -83,9 +82,9 @@ function applyScalar(adapter, ctx, rule, value, trace, opts) {
     return ctx
   }
 
-  const matches = adapter.find(ctx, rule, opts)
-  if (matches.length === 0) return ctx
-  writeText(adapter, matches[0], value)
+  const { selector, all } = splitRule(rule)
+  const matches = adapter.find(ctx, selector, opts)
+  for (const node of all ? matches : matches.slice(0, 1)) writeText(adapter, node, value)
   return ctx
 }
 

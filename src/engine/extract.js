@@ -1,6 +1,6 @@
 import { DOM_PROPERTIES_SET } from './dom-properties.js'
 import { MaxRuleDepthExceeded, MAX_RULE_DEPTH } from './errors.js'
-import { ruleAttrIndex } from './rule-syntax.js'
+import { ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName, readStyleVar } from './style-vars.js'
 
 export function extract(adapter, root, rules, opts = {}) {
@@ -63,16 +63,19 @@ function extractScalar(adapter, ctx, rule, trace, opts) {
 
   const at = ruleAttrIndex(rule)
   if (at !== -1) {
-    const selector = rule.slice(0, at)
+    const { selector, all } = splitRule(rule)
     const name = rule.slice(at + 1)
     const matches = selector ? adapter.find(ctx, selector, opts) : [ctx]
+    if (all && opts.allMatches) return matches.map((n) => readPropOrAttr(adapter, n, name))
     if (matches.length === 0) return null
     return readPropOrAttr(adapter, matches[0], name)
   }
 
   if (rule === '.') return adapter.text(ctx)
 
-  const matches = adapter.find(ctx, rule, opts)
+  const { selector, all } = splitRule(rule)
+  const matches = adapter.find(ctx, selector, opts)
+  if (all && opts.allMatches) return matches.map((n) => adapter.text(n))
   return matches.length === 0 ? null : adapter.text(matches[0])
 }
 

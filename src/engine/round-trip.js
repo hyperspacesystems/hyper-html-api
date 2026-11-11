@@ -4,7 +4,7 @@ import {
   coercePropValue,
 } from './dom-properties.js'
 import { WriteNotRoundTripped } from './errors.js'
-import { ruleAttrIndex } from './rule-syntax.js'
+import { ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName } from './style-vars.js'
 
 // Props whose read-side value keeps its whitespace. Every other text rule reads
@@ -47,6 +47,14 @@ function checkScalarRule(rule, want, got, path) {
     return
   }
   const at = ruleAttrIndex(rule)
+  if (splitRule(rule).all) {
+    if (!Array.isArray(got) || got.length === 0) fail(path)
+    for (const one of got) {
+      if (at !== -1) checkPropOrAttr(rule.slice(at + 1), want, one, path)
+      else checkText(want, one, path)
+    }
+    return
+  }
   if (at !== -1) {
     checkPropOrAttr(rule.slice(at + 1), want, got, path)
     return

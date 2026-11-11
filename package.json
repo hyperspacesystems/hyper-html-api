@@ -35,7 +35,8 @@
     "./data": "./src/data.js",
     "./upgrade": "./src/upgrade.js",
     "./page": "./src/page.js",
-    "./write": "./src/write.js"
+    "./write": "./src/write.js",
+    "./site": "./src/site.js"
   },
   "scripts": {
     "build": "npx esbuild src/hyper-html-api.js --bundle --minify --format=iife --global-name=HyperHtmlApi --outfile=dist/hyper-html-api.min.js && npm run build:engine && npm run build:engine:esm",

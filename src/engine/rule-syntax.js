@@ -34,12 +34,22 @@ export function ruleAttrIndex(rule) {
   return found
 }
 
+const ALL = '[*]'
+
 // "<selector>@<prop>" split at that separator. selector is "" for a leading "@"
-// (the context node itself); prop is null when the rule names no prop.
+// (the context node itself); prop is null when the rule names no prop. A selector
+// that ends in "[*]" names every match instead of the first: `all` is true and
+// the marker is removed, because "[*]" is not CSS and no adapter can run it.
 export function splitRule(rule) {
   const at = ruleAttrIndex(rule)
-  if (at === -1) return { selector: rule, prop: null }
-  return { selector: rule.slice(0, at), prop: rule.slice(at + 1) || null }
+  const head = at === -1 ? rule : rule.slice(0, at)
+  const all = head.endsWith(ALL)
+  const split = {
+    selector: all ? head.slice(0, -ALL.length) : head,
+    prop: at === -1 ? null : rule.slice(at + 1) || null,
+  }
+  if (all) split.all = true
+  return split
 }
 
 // The list grammar needs a second split: "container > row" says where a row
