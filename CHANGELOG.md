@@ -134,6 +134,21 @@
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-11
+
+### Added
+- Rules can use `[*]` to apply to all matches.
+- The site module adds `projectSite` and `writeSite` for reading and writing shared site data.
+
+### Changed
+- The Block editor host contract is now `blockeditor` instead of `page`.
+
+### Fixed
+- Shared site values are read key by key, and a missing element is told apart from an absent attribute.
+- Documents upgrade when the new version adds an empty nested list inside a row: the list grows from the page's seeds instead of the upgrade refusing.
+- During an upgrade, a field the owner left empty inside a list row stays empty instead of taking the new template's sample value.
+- During an upgrade, a field or list that the new version adds inside a list item starts empty.
+
 ## [0.13.0] - 2026-10-30
 
 ### Added
