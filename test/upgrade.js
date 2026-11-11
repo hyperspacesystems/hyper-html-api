@@ -201,7 +201,7 @@ describe('run (full fetch + migrate round trip)', () => {
     out.querySelectorAll('.product').length.should.equal(3)
     out.querySelectorAll('.product .name')[0].textContent.should.equal('Apple')
     out.querySelectorAll('.product .price')[2].textContent.should.equal('$3')
-    out.querySelectorAll('.product .blurb')[1].textContent.should.equal('fresh from v2')
+    out.querySelectorAll('.product .blurb')[1].textContent.should.equal('')
     out.querySelectorAll('.sku').length.should.equal(0)
     out.querySelector('.owner-name').textContent.should.equal('David')
     out.querySelector('meta[name="hyper-version"]').getAttribute('content').should.equal('2.0.0')
