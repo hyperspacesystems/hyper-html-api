@@ -1,3 +1,6 @@
+import { DOM_PROPERTIES_READ_ONLY_SET } from '../engine/dom-properties.js'
+import { ruleAttrIndex } from '../engine/rule-syntax.js'
+
 /**
  * Walk v2Rules pulling matching values from v1Data.
  *
@@ -6,6 +9,11 @@
  *   - Object arrays ([sel, shape]): carry v1's items, trimmed to v1's count;
  *     each item shape-matches recursively. Fields v2 added that didn't exist
  *     in v1 are left undefined → template default.
+ *   - Inside a list item, a field v1 read as null is carried as null, so the
+ *     write clears it. A row is written over a v2 sample row, or over a clone
+ *     of one, and an empty field left undefined would keep that sample's
+ *     value (its label, its cover, its done mark). A property nothing can
+ *     write (tagName, childElementCount) stays undefined.
  *   - Scalar arrays (`sel[]`): carry as-is.
  *   - Objects: recurse per key.
  *
@@ -19,7 +27,7 @@ export function shapeMatch(v1Data, v2Rules) {
   return { data, summary }
 }
 
-function walk(rule, v1, summary) {
+function walk(rule, v1, summary, inRow = false) {
   if (typeof rule === 'string') {
     if (rule.endsWith('[]')) {
       if (!Array.isArray(v1)) return undefined
@@ -27,7 +35,8 @@ function walk(rule, v1, summary) {
       summary.carriedOver += v1.length
       return v1
     }
-    if (v1 === undefined || v1 === null) return undefined
+    if (v1 === undefined) return undefined
+    if (v1 === null) return inRow && !readOnly(rule) ? null : undefined
     // A scalar slot can't hold an object/array from v1; leave the template
     // default (collectDiscards counts the dropped leaves).
     if (typeof v1 === 'object') return undefined
@@ -38,17 +47,22 @@ function walk(rule, v1, summary) {
     const [, shape] = rule
     if (!Array.isArray(v1)) return undefined
     summary.listItems += v1.length
-    return v1.map((item) => walk(shape, item, summary))
+    return v1.map((item) => walk(shape, item, summary, true))
   }
   if (typeof rule === 'object' && rule !== null) {
     const out = {}
     for (const [k, sub] of Object.entries(rule)) {
-      const v = walk(sub, v1 == null ? undefined : v1[k], summary)
+      const v = walk(sub, v1 == null ? undefined : v1[k], summary, inRow)
       if (v !== undefined) out[k] = v
     }
     return out
   }
   return undefined
+}
+
+function readOnly(rule) {
+  const at = ruleAttrIndex(rule)
+  return at !== -1 && DOM_PROPERTIES_READ_ONLY_SET.has(rule.slice(at + 1))
 }
 
 function collectDiscards(rule, v1, summary) {

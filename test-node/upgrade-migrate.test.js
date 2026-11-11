@@ -184,3 +184,104 @@ test('migrateInto: a Kanban board whose bare cards gained a checklist, a comment
   assert.equal($('#api-seeds ol.comments > li[cms-template]').length, 1)
   assert.equal($('#api-seeds ul.attachments > li[cms-template]').length, 1)
 })
+
+// A row is written over the sample row at the same place, or over a clone of the list's
+// first row. A field the owner's row has empty must end up empty, not keep that sample's value.
+
+const ROWS_V2 = `
+<script data-rules-name="api" data-rules-version="1">
+  {"cards":["ol.cards > li.card",{"title":"h3","cover":"@data-cover","done":"@data-done","note":"p.note"}]}
+</script>
+<ol class="cards">
+  <li class="card" data-cover="red" data-done><h3>Sample one</h3><p class="note">Sample note one</p></li>
+  <li class="card" data-cover="blue"><h3>Sample two</h3><p class="note">Sample note two</p></li>
+</ol>
+`
+
+test('migrateInto: a row with an empty field does not take the value of the sample row at its place', () => {
+  const $ = load(ROWS_V2)
+  migrateInto(cheerioAdapter, $.root(), {
+    api: {
+      cards: [
+        { title: 'Mine, with nothing set', cover: null, done: null, note: null },
+        { title: 'Mine, with everything set', cover: 'green', done: '', note: 'My note' },
+        { title: 'A third, built from the first sample', cover: null, done: null, note: null },
+      ],
+    },
+  })
+  const rows = $('li.card').map((i, el) => ({
+    title: $(el).find('h3').text(),
+    cover: $(el).attr('data-cover') ?? null,
+    done: $(el).attr('data-done') ?? null,
+    note: $(el).find('p.note').text(),
+  })).get()
+  assert.deepEqual(rows, [
+    { title: 'Mine, with nothing set', cover: null, done: null, note: '' },
+    { title: 'Mine, with everything set', cover: 'green', done: '', note: 'My note' },
+    { title: 'A third, built from the first sample', cover: null, done: null, note: '' },
+  ])
+})
+
+// The Journal's case: an entry's pin is an attribute, and a sample entry may ship pinned.
+test('migrateInto: an unpinned entry stays unpinned where the new version\'s sample entry is pinned', () => {
+  const $ = load(`
+<script data-rules-name="api" data-rules-version="1">
+  {"entries":["#entries > article.entry",{"id":"@data-id","body":".entry-body@textContent","deletedAt":"@data-deleted-at","pinned":"@data-pinned"}]}
+</script>
+<div id="entries">
+  <article class="entry" data-id="welcm1" data-pinned="true"><code class="entry-body">Welcome</code></article>
+  <article class="entry" data-id="plan01" data-deleted-at=""><code class="entry-body">A plan</code></article>
+</div>
+`)
+  migrateInto(cheerioAdapter, $.root(), {
+    api: {
+      entries: [
+        { id: 'mine01', body: 'Mine, never pinned', deletedAt: null, pinned: null },
+        { id: 'mine02', body: 'Mine, pinned', deletedAt: null, pinned: 'true' },
+        { id: 'mine03', body: 'Mine, deleted', deletedAt: '2026-11-01T10:00:00', pinned: null },
+      ],
+    },
+  })
+  const entries = $('article.entry').map((i, el) => ({
+    id: $(el).attr('data-id'),
+    body: $(el).find('.entry-body').text(),
+    pinned: $(el).attr('data-pinned') ?? null,
+    deletedAt: $(el).attr('data-deleted-at') ?? null,
+  })).get()
+  assert.deepEqual(entries, [
+    { id: 'mine01', body: 'Mine, never pinned', pinned: null, deletedAt: null },
+    { id: 'mine02', body: 'Mine, pinned', pinned: 'true', deletedAt: null },
+    { id: 'mine03', body: 'Mine, deleted', pinned: null, deletedAt: '2026-11-01T10:00:00' },
+  ])
+})
+
+// A missing description element reads as null and an empty one as ''. Both mean no description.
+const sameBoard = (data) => JSON.parse(JSON.stringify(data, (key, value) => (key === 'desc' && value === '' ? null : value)))
+
+test('migrateInto: a Kanban board with marks removed, a card moved and a card added upgrades into the same board', () => {
+  const data = readApi(KANBAN)
+  const cards = () => data.lists.flatMap((list) => list.cards)
+  const done = cards().find((card) => card.complete === '')
+  const covered = cards().find((card) => card.cover)
+  const labelled = cards().find((card) => card.labels)
+  const described = data.lists[1].cards.find((card) => card.desc)
+  assert.equal(Boolean(done && covered && labelled && described), true)
+
+  // The owner unticks Complete, picks No cover and unticks a card's only label.
+  done.complete = null
+  covered.cover = null
+  labelled.labels = null
+  // A card with a description moves to the end of its list, so every card after it moves up one place.
+  const list = data.lists[1]
+  list.cards.push(list.cards.splice(list.cards.indexOf(described), 1)[0])
+  // A new card with only a title goes first in a list whose first sample card has a label.
+  data.lists[0].cards.unshift({
+    id: 'c-new001', num: '99', title: 'Added by the owner', desc: null, labels: null, cover: null, coverImage: null,
+    due: null, start: null, complete: null, members: null, checklists: [], comments: [], attachments: [],
+  })
+
+  const $ = load(KANBAN)
+  migrateInto(cheerioAdapter, $.root(), { api: data })
+  assert.deepEqual(sameBoard(readApi($.html())), sameBoard(data))
+})
+

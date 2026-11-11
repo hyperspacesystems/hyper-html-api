@@ -58,3 +58,42 @@ test('shape-match: nested object array discards count correctly', () => {
   const { summary } = shapeMatch(v1Data, v2Rules)
   assert.equal(summary.discarded, 1)
 })
+
+// A row is the owner's own. Written over a sample row, or over a clone of the list's first
+// row, a field left undefined would keep that sample's value.
+test('shape-match: inside a list row an empty v1 field stays empty', () => {
+  const v2Rules = { cards: ['.card', { title: 'h3', cover: '@data-cover', note: '.note' }] }
+  const v1Data = {
+    cards: [
+      { title: 'A', cover: null, note: null },
+      { title: 'B', cover: 'red', note: 'kept' },
+    ],
+  }
+  const { data, summary } = shapeMatch(v1Data, v2Rules)
+  assert.deepEqual(data.cards, [
+    { title: 'A', cover: null, note: null },
+    { title: 'B', cover: 'red', note: 'kept' },
+  ])
+  assert.equal(summary.carriedOver, 4)
+  assert.equal(summary.discarded, 0)
+})
+
+test('shape-match: rows inside rows keep their empty fields too', () => {
+  const v2Rules = { lists: ['.list', { cards: ['.card', { title: 'h3', cover: '@data-cover' }] }] }
+  const { data } = shapeMatch({ lists: [{ cards: [{ title: 'A', cover: null }] }] }, v2Rules)
+  assert.deepEqual(data, { lists: [{ cards: [{ title: 'A', cover: null }] }] })
+})
+
+test('shape-match: outside a list an empty v1 field keeps v2\'s default, and a field v1 never had stays undefined in a row', () => {
+  const v2Rules = { heading: 'h1', cards: ['.card', { title: 'h3', added: '@data-added' }] }
+  const { data } = shapeMatch({ heading: null, cards: [{ title: 'A' }] }, v2Rules)
+  assert.equal('heading' in data, false)
+  assert.deepEqual(data.cards, [{ title: 'A' }])
+})
+
+// Writing null to such a property refuses the whole write, so an upgrade would refuse too.
+test('shape-match: an empty v1 field that reads a property nothing can write is left alone in a row', () => {
+  const v2Rules = { cards: ['.card', { title: 'h3', kind: '@tagName', count: '.steps@childElementCount', cover: '.art@data-cover' }] }
+  const { data } = shapeMatch({ cards: [{ title: 'A', kind: null, count: null, cover: null }] }, v2Rules)
+  assert.deepEqual(data.cards, [{ title: 'A', cover: null }])
+})
