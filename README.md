@@ -91,7 +91,10 @@ HyperHtmlApi.upgrade.run({ sourceUrl?, dataByName?, fromVersion? })
 
 The join is name-match per rules tag: fields present in both carry over, fields
 only in the old data are discarded (and counted in `summary`), fields only in
-the new template keep its defaults, and list counts follow the old data. For
+the new template keep its defaults, and list counts follow the old data. A list
+item is the exception to defaults: it is the owner's own row, so a field the new
+template adds inside a list item starts empty (a list starts with no items)
+instead of taking the value of the template's sample item. For
 richer migrations (renames, splits, computed fields) the source declares a
 transform as a non-executing script tag in its own HTML:
 

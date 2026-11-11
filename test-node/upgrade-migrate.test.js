@@ -48,13 +48,24 @@ test('migrateInto: exact-name join applies matching entries', () => {
   assert.equal(byName.settings.carriedOver, 1)
 })
 
-test('migrateInto: v2 fields with no v1 data keep template defaults', () => {
+test('migrateInto: outside a list, a v2 field with no v1 data keeps the template default', () => {
   const $ = load(V2_HTML)
   migrateInto(cheerioAdapter, $.root(), {
-    api: { heading: 'Mine', products: [{ name: 'Solo', price: '$9' }] },
+    api: { products: [{ name: 'Solo', price: '$9', blurb: 'Mine' }] },
     settings: { ownerName: 'D' },
   })
-  assert.equal($('.product').eq(0).find('.blurb').text(), 'default')
+  assert.equal($('h1').text(), 'New Store')
+  assert.equal($('.product').eq(0).find('.blurb').text(), 'Mine')
+})
+
+// A row is the owner's own, so it never starts with the sample row's value (David, 2026-11-11).
+test('migrateInto: inside a list row, a v2 field with no v1 data starts empty', () => {
+  const $ = load(V2_HTML)
+  migrateInto(cheerioAdapter, $.root(), {
+    api: { heading: 'Mine', products: [{ name: 'Solo', price: '$9' }, { name: 'Second', price: '$3' }] },
+    settings: { ownerName: 'D' },
+  })
+  assert.deepEqual($('.product').map((i, el) => $(el).find('.name').text() + '|' + $(el).find('.blurb').text()).get(), ['Solo|', 'Second|'])
 })
 
 test('migrateInto: v2 tag with no matching v1 entry stays untouched', () => {
@@ -219,6 +230,57 @@ test('migrateInto: a row with an empty field does not take the value of the samp
     { title: 'Mine, with nothing set', cover: null, done: null, note: '' },
     { title: 'Mine, with everything set', cover: 'green', done: '', note: 'My note' },
     { title: 'A third, built from the first sample', cover: null, done: null, note: '' },
+  ])
+})
+
+// What a new version adds to every row: an attribute, a tick, an id, a list of steps, a list of tags.
+const ADDED_V2 = `
+<script data-rules-name="api" data-rules-version="1">
+  {"heading":"h1","rows":["table.rows > tbody > tr.row",{"label":".label","id":"@id","flag":"@data-flag","done":"input.done@checked","steps":["ul.steps > li",{"text":"@textContent"}],"tags":".tag[]"}]}
+</script>
+<h1>Sample heading</h1>
+<table class="rows"><tbody>
+  <tr class="row" id="row-sample" data-flag="hot"><td class="label">Sample row</td><td><input class="done" type="checkbox" checked><ul class="steps"><li>Sample step one</li><li>Sample step two</li></ul><span class="tag">sample</span><span class="tag">tag</span></td></tr>
+</tbody></table>
+<ul hidden><li cms-template></li></ul>
+`
+const addedRows = ($) => $('tr.row').map((i, el) => ({
+  label: $(el).find('.label').text(),
+  id: $(el).attr('id') ?? null,
+  flag: $(el).attr('data-flag') ?? null,
+  done: $(el).find('input.done').attr('checked') !== undefined,
+  steps: $(el).find('ul.steps > li').map((j, li) => $(li).text()).get(),
+  tags: $(el).find('.tag').map((j, tag) => $(tag).text()).get(),
+})).get()
+
+// The calculator's case: 1.0.0 never recorded a row's id, and 1.1.0's sample row has one.
+test('migrateInto: rows from a version that had none of the new fields take nothing from the sample row', () => {
+  const $ = load(ADDED_V2)
+  migrateInto(cheerioAdapter, $.root(), {
+    api: { rows: [{ label: 'Studio rent' }, { label: 'Accountant' }] },
+  })
+  // An emptied id is written as an empty id attribute, as every empty id is, so '' and none count the same here.
+  assert.deepEqual(addedRows($).map((row) => ({ ...row, id: row.id || null })), [
+    { label: 'Studio rent', id: null, flag: null, done: false, steps: [], tags: [] },
+    { label: 'Accountant', id: null, flag: null, done: false, steps: [], tags: [] },
+  ])
+  // Outside the list the new version's own heading stays.
+  assert.equal($('h1').text(), 'Sample heading')
+})
+
+test('migrateInto: rows that have the new fields keep their own values, beside rows that have none', () => {
+  const $ = load(ADDED_V2)
+  migrateInto(cheerioAdapter, $.root(), {
+    api: {
+      rows: [
+        { label: 'Bare' },
+        { label: 'Full', id: 'row-mine', flag: 'cold', done: true, steps: [{ text: 'My step' }], tags: ['mine'] },
+      ],
+    },
+  })
+  assert.deepEqual(addedRows($).map((row) => ({ ...row, id: row.id || null })), [
+    { label: 'Bare', id: null, flag: null, done: false, steps: [], tags: [] },
+    { label: 'Full', id: 'row-mine', flag: 'cold', done: true, steps: ['My step'], tags: ['mine'] },
   ])
 })
 

@@ -4,18 +4,25 @@ import { ruleAttrIndex } from '../engine/rule-syntax.js'
 /**
  * Walk v2Rules pulling matching values from v1Data.
  *
+ * Outside a list, what v1 has no value for keeps v2's template default:
+ *
  *   - Scalar leaves: carry the v1 value if defined, else leave undefined so
  *     the engine keeps v2's template default on apply.
- *   - Object arrays ([sel, shape]): carry v1's items, trimmed to v1's count;
- *     each item shape-matches recursively. Fields v2 added that didn't exist
- *     in v1 are left undefined → template default.
- *   - Inside a list item, a field v1 read as null is carried as null, so the
- *     write clears it. A row is written over a v2 sample row, or over a clone
- *     of one, and an empty field left undefined would keep that sample's
- *     value (its label, its cover, its done mark). A property nothing can
- *     write (tagName, childElementCount) stays undefined.
- *   - Scalar arrays (`sel[]`): carry as-is.
+ *   - Lists: carry v1's items, trimmed to v1's count; a list v1 never had
+ *     keeps v2's rows.
  *   - Objects: recurse per key.
+ *
+ * Inside a list item nothing keeps a default. A row is the owner's own. It is
+ * written over a v2 sample row, or over a clone of one, so a field left
+ * undefined would take that sample's value (its label, its cover, its done
+ * mark, its id). So in a row:
+ *
+ *   - A field v1 read as null, a field v1 never had (v2 added it), and a
+ *     scalar field where v1 holds an object are all carried as null, and the
+ *     write clears them.
+ *   - A list v1 never had is carried as an empty list.
+ *   - A property nothing can write (tagName, childElementCount) stays
+ *     undefined, because writing null to it refuses the whole write.
  *
  * Returns { data, summary } where summary counts scalar leaves carried,
  * dropped, and total list items preserved.
@@ -30,22 +37,20 @@ export function shapeMatch(v1Data, v2Rules) {
 function walk(rule, v1, summary, inRow = false) {
   if (typeof rule === 'string') {
     if (rule.endsWith('[]')) {
-      if (!Array.isArray(v1)) return undefined
+      if (!Array.isArray(v1)) return inRow ? [] : undefined
       summary.listItems += v1.length
       summary.carriedOver += v1.length
       return v1
     }
-    if (v1 === undefined) return undefined
-    if (v1 === null) return inRow && !readOnly(rule) ? null : undefined
-    // A scalar slot can't hold an object/array from v1; leave the template
-    // default (collectDiscards counts the dropped leaves).
-    if (typeof v1 === 'object') return undefined
+    // A scalar slot can't hold an object/array from v1 (collectDiscards counts
+    // the dropped leaves), so it is treated as a slot v1 has no value for.
+    if (v1 == null || typeof v1 === 'object') return inRow && !readOnly(rule) ? null : undefined
     summary.carriedOver++
     return v1
   }
   if (Array.isArray(rule)) {
     const [, shape] = rule
-    if (!Array.isArray(v1)) return undefined
+    if (!Array.isArray(v1)) return inRow ? [] : undefined
     summary.listItems += v1.length
     return v1.map((item) => walk(shape, item, summary, true))
   }
