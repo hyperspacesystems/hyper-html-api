@@ -134,6 +134,13 @@
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-12
+
+### Added
+- `readDocument` reads a document, reading canonical sheet grids directly from bytes and falling back to the full tree whenever the result could differ.
+- Document rules version 2 adds codec keys.
+- Patch bodies are now classified.
+
 ## [0.14.0] - 2026-11-11
 
 ### Added
