@@ -40,6 +40,10 @@ let config = {
   // under CPU load (a release running beside other builds) failed a 2 s budget on code that
   // takes milliseconds. 20 s still catches a real hang.
   testFramework: { config: { timeout: 20000 } },
+  // Under the same load, Chrome took longer than the 30 s default to open a test page
+  // (2026-11-13), which failed every file before a single test ran.
+  browserStartTimeout: 120000,
+  testsStartTimeout: 120000,
   nodeResolve: true,
   coverage: true,
   coverageConfig: {
