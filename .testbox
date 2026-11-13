@@ -1,0 +1,12 @@
+# Runs the release suite (node tests, conformance, browser tests on three engines) on a
+# throwaway box: `testbox run`. See ~/Documents/GitHub/bash_commands/testbox/README.md.
+TESTBOX_REPO=hyper-html-api
+TESTBOX_SETUP='npm ci --no-audit --no-fund && npx playwright install chromium firefox webkit'
+# Every suite runs even when an earlier one fails, so one box run reports all three; each
+# suite's exit code is printed and written to $TESTBOX_OUT/suites.txt.
+TESTBOX_COMMAND='s=0; for c in test:node conformance:check test:all; do npm run $c; r=$?; echo "SUITE $c exit $r" | tee -a "$TESTBOX_OUT/suites.txt"; [ $r -eq 0 ] || s=1; done; exit $s'
+TESTBOX_TIMEOUT=${TESTBOX_TIMEOUT:-45m}
+TESTBOX_WARM_BROWSERS='chromium firefox webkit'
+# test-node/dom-api-guarded-apply.test.js reads ClayJS's generated data satellite from the
+# sibling checkout (../clayjs), so the path follows wherever this checkout sits.
+TESTBOX_EXTRA_FILES=("$(cd "$CONFIG_DIR/.." && pwd)/clayjs/entries/clay-data.js")

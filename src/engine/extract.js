@@ -2,11 +2,13 @@ import { DOM_PROPERTIES_SET } from './dom-properties.js'
 import { MaxRuleDepthExceeded, MAX_RULE_DEPTH } from './errors.js'
 import { ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName, readStyleVar } from './style-vars.js'
+import { checkCodecRules, codecForRule } from './codecs.js'
 
 export function extract(adapter, root, rules, opts = {}) {
   if (Object.prototype.hasOwnProperty.call(opts, 'exclude') && adapter.semanticExclude === false) {
     throw new Error('This adapter does not support semantic exclude queries; omit exclude or use the DOM adapter.')
   }
+  checkCodecRules(rules, opts)
   return extractAt(adapter, root, rules, { depth: 0, path: [] }, opts)
 }
 
@@ -57,6 +59,9 @@ function extractScalar(adapter, ctx, rule, trace, opts) {
     return matches.map((n) => adapter.text(n))
   }
 
+  const codec = codecForRule(rule, opts)
+  if (codec) return readCodec(adapter, ctx, codec, opts)
+
   if (rule.startsWith('@')) {
     return readPropOrAttr(adapter, ctx, rule.slice(1))
   }
@@ -77,6 +82,12 @@ function extractScalar(adapter, ctx, rule, trace, opts) {
   const matches = adapter.find(ctx, selector, opts)
   if (all && opts.allMatches) return matches.map((n) => adapter.text(n))
   return matches.length === 0 ? null : adapter.text(matches[0])
+}
+
+function readCodec(adapter, ctx, { selector, codec }, opts) {
+  const matches = selector ? adapter.find(ctx, selector, opts) : [ctx]
+  if (matches.length === 0) return null
+  return codec.read(adapter, matches[0], { query: opts.query, view: opts.view, region: opts.region })
 }
 
 // The path is copied because the caller is handed it and every nested path is

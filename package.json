@@ -9,7 +9,7 @@
     "apply",
     "CMS"
   ],
-  "version": "0.14.0",
+  "version": "0.15.0",
   "homepage": "https://github.com/panphora/hyper-html-api",
   "bugs": {
     "url": "https://github.com/panphora/hyper-html-api/issues"
@@ -36,7 +36,9 @@
     "./upgrade": "./src/upgrade.js",
     "./page": "./src/page.js",
     "./write": "./src/write.js",
-    "./site": "./src/site.js"
+    "./site": "./src/site.js",
+    "./codecs/sheet": "./src/codecs/sheet.js",
+    "./read": "./src/read.js"
   },
   "scripts": {
     "build": "npx esbuild src/hyper-html-api.js --bundle --minify --format=iife --global-name=HyperHtmlApi --outfile=dist/hyper-html-api.min.js && npm run build:engine && npm run build:engine:esm",
@@ -69,7 +71,7 @@
     "hyper-morph": "^1.7.0"
   },
   "devDependencies": {
-    "@panphora/clayjs": "^1.13.1",
+    "@panphora/clayjs": "^1.24.0",
     "@web/test-runner": "^0.20.0",
     "@web/test-runner-playwright": "^0.11.0",
     "chai": "^4.3.6",

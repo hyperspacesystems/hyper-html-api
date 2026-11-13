@@ -1,4 +1,5 @@
 import { splitRule } from './rule-syntax.js'
+import { checkCodecRules } from './codecs.js'
 
 function isPlainObject(v) {
   return v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -13,6 +14,7 @@ function label(path) {
 // Shape problems are left to apply(), which already reports them. Inside list
 // items only unknown keys are checked, because new rows do not exist yet.
 export function planWrite(adapter, root, rules, data, opts = {}) {
+  checkCodecRules(rules, opts)
   const unknownKeys = []
   const unmatched = []
 

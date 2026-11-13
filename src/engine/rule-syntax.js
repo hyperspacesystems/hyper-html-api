@@ -10,6 +10,8 @@
 // rule into `a[href="mailto:hi` and `example.com"]`, which reads downstream as
 // an invalid selector when the rule the author wrote was correct.
 
+import { RulesParseError } from './errors.js'
+
 // Index of the separator "@", or -1 when the rule has no prop part.
 export function ruleAttrIndex(rule) {
   let depth = 0
@@ -121,4 +123,18 @@ function isSingleCompound(selector, start) {
     }
   }
   return true
+}
+
+const CODEC_PROP = /^codec\(([a-z][a-z0-9-]*)\)$/
+
+// { selector, name } when a scalar rule calls a codec, else null.
+export function codecOf(rule) {
+  if (typeof rule !== 'string') return null
+  const at = ruleAttrIndex(rule)
+  if (at === -1) return null
+  const match = CODEC_PROP.exec(rule.slice(at + 1))
+  if (!match) return null
+  const { selector, all } = splitRule(rule)
+  if (all) throw new RulesParseError('A @codec(name) rule cannot use [*].')
+  return { selector, name: match[1] }
 }

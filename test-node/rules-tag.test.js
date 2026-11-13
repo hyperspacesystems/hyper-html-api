@@ -91,11 +91,11 @@ test('findRulesIn', async (t) => {
     })
   })
 
-  await t.test('throws UnknownRulesVersion when data-rules-version is not "1"', () => {
-    const $ = load('<script data-rules-name="api" data-rules-version="2">{"title":"h1"}</script>')
+  await t.test('throws UnknownRulesVersion when data-rules-version is not "1" or "2"', () => {
+    const $ = load('<script data-rules-name="api" data-rules-version="3">{"title":"h1"}</script>')
     assert.throws(() => findRulesIn(cheerioAdapter, $.root(), 'api'), (err) => {
       assert.ok(err instanceof UnknownRulesVersion)
-      assert.equal(err.version, '2')
+      assert.equal(err.version, '3')
       return true
     })
   })

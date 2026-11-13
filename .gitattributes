@@ -3,3 +3,4 @@
 
 # Conformance cases pin exact bytes (CRLF included); never normalize them.
 conformance/cases/** -text
+conformance/sheet/** -text

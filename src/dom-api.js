@@ -4,9 +4,12 @@ import domAdapter, { createDomAdapter } from './adapters/dom.js'
 // The DOM-bound engine: every engine call pre-wired with the DOM adapter. Lives
 // here (instead of inline in hyper-html-api.js) so both the full CDN bundle and
 // the lean `data.js` entry share one definition.
+// Calls default `codecs` to the ones registered with engine.codecs.register.
+const withCodecs = (opts) => ({ codecs: engineMod.registeredCodecs(), ...opts })
+
 export const engine = {
-  extract: (root, rules, opts = {}) => engineMod.extract(createDomAdapter(root, opts), root, rules, opts),
-  apply: (root, rules, data, opts = {}) => engineMod.apply(createDomAdapter(root, { ...opts, _write: true }), root, rules, data, opts),
+  extract: (root, rules, opts = {}) => engineMod.extract(createDomAdapter(root, opts), root, rules, withCodecs(opts)),
+  apply: (root, rules, data, opts = {}) => engineMod.apply(createDomAdapter(root, { ...opts, _write: true }), root, rules, data, withCodecs(opts)),
   findRulesIn: (root, token) => engineMod.findRulesIn(domAdapter, root, token),
   findRules: (root, source) => engineMod.resolveRules(domAdapter, root, source),
   bind: (root, source, opts = {}) => {
@@ -15,12 +18,14 @@ export const engine = {
       const what = typeof source === 'string' ? `data-rules-name~="${source}"` : 'the provided rules object'
       throw new Error(`hyper-html-api: could not resolve rules for ${what}`)
     }
+    const callOpts = withCodecs({ version: found.version, ...opts })
     return {
       ...found,
-      get: () => engineMod.extract(createDomAdapter(root, opts), root, found.rules, opts),
-      set: data => engineMod.apply(createDomAdapter(root, { ...opts, _write: true }), root, found.rules, data, opts),
+      get: () => engineMod.extract(createDomAdapter(root, opts), root, found.rules, callOpts),
+      set: data => engineMod.apply(createDomAdapter(root, { ...opts, _write: true }), root, found.rules, data, callOpts),
     }
   },
+  codecs: { register: engineMod.registerCodec, get: engineMod.getCodec },
   parseStrict: engineMod.parseStrict,
   parseRelaxed: engineMod.parseRelaxed,
   // Adapter-free, like the parsers above: a consumer that has to split a rule
@@ -38,7 +43,7 @@ function defaultRules(root) {
   const searchRoot = root && root.ownerDocument ? root.ownerDocument : root
   const found = engineMod.findRulesIn(domAdapter, searchRoot, 'api')
   if (!found) throw new engineMod.errors.NoRulesTag('api')
-  return found.rules
+  return { rules: found.rules, version: found.version }
 }
 
 function containingTree(root) {
@@ -119,8 +124,8 @@ function assertNoReadOnlyTargets(rule, value) {
   }
 }
 
-function guardedApply(root, rules, data) {
-  const opts = { templateAttr: 'cms-template' }
+function guardedApply(root, rules, data, version) {
+  const opts = withCodecs({ templateAttr: 'cms-template', version })
   const liveTree = containingTree(root)
   const rootPath = childIndexPath(liveTree, root)
   const detachedTree = cloneContainingTree(liveTree)
@@ -145,7 +150,8 @@ function guardedApply(root, rules, data) {
 
 function exposeWriteError(error) {
   if (!(error instanceof Error)) return error
-  const code = error.name || 'Error'
+  const keepsCode = error instanceof engineMod.errors.UnknownCodec || error instanceof engineMod.errors.CodecRefused
+  const code = keepsCode ? error.code : error.name || 'Error'
   try {
     error.code = code
   } catch {
@@ -182,7 +188,10 @@ function exposeWriteError(error) {
 export function extractData(a, b) {
   const root = isNode(a) ? a : document
   const source = isNode(a) ? b : a
-  if (source === undefined) return engineMod.extract(createDomAdapter(root), root, defaultRules(root))
+  if (source === undefined) {
+    const { rules, version } = defaultRules(root)
+    return engineMod.extract(createDomAdapter(root), root, rules, withCodecs({ version }))
+  }
   return engine.bind(root, source).get()
 }
 
@@ -193,8 +202,8 @@ export function applyData(root, data, source) {
     if (!isNode(root)) {
       throw new Error('hyper-html-api: applyData(root, data, source?) needs a DOM root as the first argument.')
     }
-    const rules = source === undefined ? defaultRules(root) : engine.bind(root, source).rules
-    guardedApply(root, rules, data)
+    const { rules, version } = source === undefined ? defaultRules(root) : engine.bind(root, source)
+    guardedApply(root, rules, data, version)
   } catch (error) {
     throw exposeWriteError(error)
   }

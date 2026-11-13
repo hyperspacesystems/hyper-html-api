@@ -25,11 +25,16 @@ import { fileURLToPath } from "node:url";
 import * as cheerio from "cheerio";
 import adapter from "../src/adapters/cheerio.js";
 import { extract, parseRelaxed, findRulesIn } from "../src/engine/index.js";
-import { writeDocument } from "../src/write.js";
+import { writeDocument, patchDocument, isPatchBody } from "../src/write.js";
+import { readDocument, parseSheetQuery, documentRules } from "../src/read.js";
+import { QueryRefused } from "../src/codecs/sheet.js";
 import { WRITE_POLICY } from "../src/engine/write-policy.js";
+import { isDeepStrictEqual } from "node:util";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CASES = join(ROOT, "conformance", "cases");
+// cases/ is the generic corpus every host runs today; sheet/ holds the sheet codec's
+// read and patch faces, which a host adopts when it ports the codec.
+const CASE_DIRS = [join(ROOT, "conformance", "cases"), join(ROOT, "conformance", "sheet")];
 const MANIFEST = join(ROOT, "conformance", "MANIFEST.json");
 
 const mode = process.argv[2];
@@ -41,7 +46,9 @@ if (mode !== "generate" && mode !== "check") {
 // ---------- .meta ----------
 // Flat `key: value` lines. Blank lines and # comments ignored.
 //   tier:      1 both adapters agree | 2 host-specific | 3 documented divergence
-//   face:      query (rules from .rules, as a ?data= value) | tag (rules from the document) | write (POST .data.json through the document's rules tag) | write-query (POST .data.json with caller-supplied .rules, ignoring any tag in the document)
+//   face:      query (rules from .rules, as a ?data= value) | tag (rules from the document) | write (POST .data.json through the document's rules tag) | write-query (POST .data.json with caller-supplied .rules, ignoring any tag in the document) | read (readDocument: the document's tag, with query and view) | patch (patchDocument with the patch list in .data.json) | params (parseSheetQuery on the URL query string in `params`, then readDocument with the result) | body (isPatchBody on the request body in .data.json against the document's rules tag: writes .body.json { kind: "patch" | "data" })
+//   query:     face=read only, the query as one line of JSON, e.g. {"sheet":"Budget","range":"A1:C3"}
+//   view:      face=read only, e.g. digest
 //   token:     face=tag only, the data-rules-name token to look up (default "api")
 //   expect:    ok | error
 //   skip:      <host>=<reason>, repeatable
@@ -57,9 +64,11 @@ function parseMeta(text) {
     const value = t.slice(i + 1).trim();
     if (key === "skip") meta.skip.push(value);
     else if (key === "tier") meta.tier = Number(value);
+    else if (key === "query") meta.query = JSON.parse(value);
+    else if (key === "params") meta.params = value;
     else meta[key] = value;
   }
-  if (!["query", "tag", "write", "write-query"].includes(meta.face)) throw new Error(`bad face: ${meta.face}`);
+  if (!["query", "tag", "write", "write-query", "read", "patch", "body", "params"].includes(meta.face)) throw new Error(`bad face: ${meta.face}`);
   if (!["ok", "error"].includes(meta.expect)) throw new Error(`bad expect: ${meta.expect}`);
   if (![1, 2, 3].includes(meta.tier)) throw new Error(`bad tier: ${meta.tier}`);
   return meta;
@@ -76,7 +85,7 @@ function referenceStatus(err, face) {
   const name = err && err.name;
   const message = (err && err.message) || "";
   if (face === "tag") {
-    if (name === "UnknownRulesVersion" || name === "RulesParseError") return 400;
+    if (["UnknownRulesVersion", "RulesParseError", "UnknownCodec", "CodecRefused"].includes(name)) return 400;
     return message.includes("selector") ? 400 : 500;
   }
   if (message.includes("JSON")) return 400;
@@ -89,10 +98,74 @@ function referenceStatus(err, face) {
 // (.after.html, compared byte for byte), the fresh extraction (.after.json),
 // whether anything changed and whether the splice held (.write.json), or the
 // error (.error.json, with the structured details a host puts in its body).
-const WRITE_400 = ["NoRulesTag", "WriteRejected", "WriteRefused", "ShapeMismatch", "EmptyListInsert", "UnknownRulesVersion", "RulesParseError"];
+const WRITE_400 = ["NoRulesTag", "WriteRejected", "WriteRefused", "ShapeMismatch", "EmptyListInsert", "UnknownRulesVersion", "RulesParseError", "UnknownCodec", "CodecRefused"];
+
+// Refusals a host answers with 409: the document is fine, but this kind of
+// write cannot apply to it as it stands.
+const CONFLICT_CODES = ["sheet-not-canonical", "sheet-write-unavailable"];
 
 function writeStatus(err) {
+  if (err && err.name === "CodecRefused" && CONFLICT_CODES.includes(err.code)) return 409;
   return WRITE_400.includes(err && err.name) ? 400 : 500;
+}
+
+// ---------- read and patch faces ----------
+// QueryRefused comes from the vendored codec, whose class sets no name.
+const SHEET_400 = ["QueryRefused", "CodecRefused", "UnknownCodec", "RulesParseError", "UnknownRulesVersion", "NoRulesTag"];
+
+function sheetError(err) {
+  const type = err instanceof QueryRefused ? "QueryRefused" : err.name;
+  const status = type === "CodecRefused" && CONFLICT_CODES.includes(err.code) ? 409 : SHEET_400.includes(type) ? 400 : 500;
+  const body = { type, message: err.message, status };
+  if (typeof err.code === "string") body.code = err.code;
+  return body;
+}
+
+function runReadCase(dir, name, meta, html) {
+  const out = { meta, files: {} };
+  let result;
+  try {
+    const query = meta.face === "params" ? parseSheetQuery(new URLSearchParams(meta.params ?? "")) ?? undefined : meta.query;
+    result = readDocument(cheerio.load, html, { token: meta.token, query, view: meta.view });
+  } catch (err) {
+    out.files[`${name}.error.json`] = stable(sheetError(err));
+    return out;
+  }
+  if (result.data === null) {
+    out.files[`${name}.error.json`] = stable({
+      type: "NoRulesTag", message: `no script[data-rules-name~="${meta.token}"]`, status: 400,
+    });
+    return out;
+  }
+  out.files[`${name}.expected.json`] = stable(result.data);
+  return out;
+}
+
+// Which kind of write a host makes of this request body: a patch or a data write.
+function runBodyCase(dir, name, meta, html) {
+  const body = JSON.parse(readFileSync(join(dir, `${name}.data.json`), "utf8"));
+  const found = documentRules(cheerio.load, html, { token: meta.token });
+  const kind = isPatchBody(body, found ? found.rules : null) ? "patch" : "data";
+  return { meta, files: { [`${name}.body.json`]: stable({ kind }) } };
+}
+
+// Appended rows are named n1, n2, ... so the bytes are the same on every run
+// and on every host.
+function runPatchCase(dir, name, meta, html) {
+  const out = { meta, files: {} };
+  const patch = JSON.parse(readFileSync(join(dir, `${name}.data.json`), "utf8"));
+  let next = 0;
+  let result;
+  try {
+    result = patchDocument(cheerio.load, html, patch, { token: meta.token, newId: () => `n${++next}` });
+  } catch (err) {
+    out.files[`${name}.error.json`] = stable(sheetError(err));
+    return out;
+  }
+  out.files[`${name}.after.html`] = result.html;
+  out.files[`${name}.write.json`] = stable({ changed: result.changed, stale: result.stale });
+  out.files[`${name}.after.json`] = stable(readDocument(cheerio.load, result.html, { token: meta.token }).data);
+  return out;
 }
 
 function writeDetails(err) {
@@ -103,23 +176,23 @@ function writeDetails(err) {
   return null;
 }
 
-function runWriteCase(name, meta, html) {
+function runWriteCase(dir, name, meta, html) {
   const out = { meta, files: {} };
-  const data = JSON.parse(readFileSync(join(CASES, `${name}.data.json`), "utf8"));
+  const data = JSON.parse(readFileSync(join(dir, `${name}.data.json`), "utf8"));
   let result;
   let rules;
   try {
     const options = { token: meta.token };
     if (meta.face === "write-query") {
-      rules = parseRelaxed(readFileSync(join(CASES, `${name}.rules`), "utf8"));
+      rules = parseRelaxed(readFileSync(join(dir, `${name}.rules`), "utf8"));
       out.files[`${name}.parsed.json`] = stable(rules);
       options.rules = rules;
     }
     result = writeDocument(cheerio.load, html, data, options);
   } catch (err) {
-    out.files[`${name}.error.json`] = stable({
-      type: err.name, message: err.message, status: writeStatus(err), details: writeDetails(err),
-    });
+    const body = { type: err.name, message: err.message, status: writeStatus(err), details: writeDetails(err) };
+    if (err.name === "CodecRefused") body.code = err.code;
+    out.files[`${name}.error.json`] = stable(body);
     return out;
   }
   out.files[`${name}.after.html`] = result.html;
@@ -131,15 +204,20 @@ function runWriteCase(name, meta, html) {
 }
 
 // ---------- run one case ----------
-function runCase(name) {
-  const meta = parseMeta(readFileSync(join(CASES, `${name}.meta`), "utf8"));
-  const html = readFileSync(join(CASES, `${name}.html`), "utf8");
-  if (meta.face === "write" || meta.face === "write-query") return runWriteCase(name, meta, html);
+function runCase(dir, name) {
+  const meta = parseMeta(readFileSync(join(dir, `${name}.meta`), "utf8"));
+  const html = readFileSync(join(dir, `${name}.html`), "utf8");
+  if (meta.face === "write" || meta.face === "write-query") return runWriteCase(dir, name, meta, html);
+  if (meta.face === "read") return runReadCase(dir, name, meta, html);
+  if (meta.face === "patch") return runPatchCase(dir, name, meta, html);
+  if (meta.face === "body") return runBodyCase(dir, name, meta, html);
+  if (meta.face === "params") return runReadCase(dir, name, meta, html);
   const $ = cheerio.load(html);
   const root = $.root();
   const out = { meta, files: {} };
 
   let rules;
+  let version = "1";
   try {
     if (meta.face === "tag") {
       const found = findRulesIn(adapter, root, meta.token);
@@ -151,8 +229,9 @@ function runCase(name) {
         return out;
       }
       rules = found.rules;
+      version = found.version;
     } else {
-      rules = parseRelaxed(readFileSync(join(CASES, `${name}.rules`), "utf8"));
+      rules = parseRelaxed(readFileSync(join(dir, `${name}.rules`), "utf8"));
     }
   } catch (err) {
     out.files[`${name}.error.json`] = stable({
@@ -165,7 +244,7 @@ function runCase(name) {
   out.files[`${name}.parsed.json`] = stable(rules);
 
   try {
-    out.files[`${name}.expected.json`] = stable(extract(adapter, root, rules));
+    out.files[`${name}.expected.json`] = stable(extract(adapter, root, rules, { version }));
   } catch (err) {
     out.files[`${name}.error.json`] = stable({
       type: err.name, message: err.message, status: referenceStatus(err, meta.face),
@@ -182,13 +261,16 @@ function stable(value) {
 }
 
 // ---------- drive ----------
-const names = readdirSync(CASES)
-  .filter(f => f.endsWith(".meta"))
-  .map(f => f.slice(0, -".meta".length))
-  .sort();
+const cases = CASE_DIRS.filter((dir) => existsSync(dir)).flatMap((dir) =>
+  readdirSync(dir)
+    .filter(f => f.endsWith(".meta"))
+    .map(f => ({ dir, name: f.slice(0, -".meta".length) }))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+);
+const names = cases.map((c) => c.name);
 
 if (names.length === 0) {
-  console.error("conformance: no cases found in " + CASES);
+  console.error("conformance: no cases found in " + CASE_DIRS.join(", "));
   process.exit(1);
 }
 
@@ -206,28 +288,38 @@ const manifest = stable({
 });
 
 let failures = 0;
+const extractionVectors = JSON.parse(readFileSync(join(ROOT, 'conformance', 'sheet-guard-extraction.json'), 'utf8'));
+for (const entry of extractionVectors.cases) {
+  for (const [view, expected] of [[undefined, entry.data], ['digest', entry.island.api]]) {
+    const actual = readDocument(cheerio.load, entry.html, { view }).data;
+    if (!isDeepStrictEqual(actual, expected)) {
+      console.error(`conformance: sheet-guard-extraction ${entry.name} ${view ?? 'api'} differs`);
+      failures++;
+    }
+  }
+}
 const wanted = new Map([[MANIFEST, manifest]]);
 wanted.set(join(ROOT, "conformance", "write-policy.json"), stable(WRITE_POLICY));
 
-for (const name of names) {
+for (const { dir, name } of cases) {
   let result;
   try {
-    result = runCase(name);
+    result = runCase(dir, name);
   } catch (err) {
     console.error(`conformance: case "${name}" could not run: ${err.message}`);
     failures++;
     continue;
   }
-  for (const [file, body] of Object.entries(result.files)) wanted.set(join(CASES, file), body);
+  for (const [file, body] of Object.entries(result.files)) wanted.set(join(dir, file), body);
 
   // An outcome file that no longer applies has to go, or a case that stops erroring keeps a
   // stale .error.json on disk and check() passes while the contract has silently moved.
   const outcomes = [
     `${name}.parsed.json`, `${name}.expected.json`, `${name}.error.json`,
-    `${name}.after.html`, `${name}.after.json`, `${name}.write.json`,
+    `${name}.after.html`, `${name}.after.json`, `${name}.write.json`, `${name}.body.json`,
   ];
   for (const file of outcomes) {
-    const path = join(CASES, file);
+    const path = join(dir, file);
     if (wanted.has(path) || !existsSync(path)) continue;
     if (mode === "generate") {
       unlinkSync(path);

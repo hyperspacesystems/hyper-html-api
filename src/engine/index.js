@@ -6,7 +6,9 @@ export { extract } from './extract.js'
 export { apply } from './apply.js'
 export { findRulesIn } from './rules-tag.js'
 export { parseStrict, parseRelaxed } from './rules.js'
-export { ruleAttrIndex, splitRule } from './rule-syntax.js'
+export { ruleAttrIndex, splitRule, codecOf } from './rule-syntax.js'
+export { registerCodec, getCodec, registeredCodecs, checkCodecRules } from './codecs.js'
+export { SUPPORTED_VERSION, SUPPORTED_VERSIONS } from './rules-tag.js'
 export * as errors from './errors.js'
 export { DOM_PROPERTIES, DOM_PROPERTIES_SET, DOM_PROPERTIES_READ_ONLY_SET } from './dom-properties.js'
 export { WRITE_POLICY, guardAdapter, checkAttribute, checkCustomPropertyValue, urlScheme } from './write-policy.js'
@@ -21,7 +23,7 @@ export { trackAdapter, spliceDocument } from './splice.js'
 // For a Document root or the cheerio $.root(), ownerDocument is absent → no-op.
 export function resolveRules(adapter, root, source) {
   if (source && typeof source === 'object') {
-    return { rules: source, tagNode: null }
+    return { rules: source, tagNode: null, version: '1' }
   }
   if (typeof source === 'string') {
     const searchRoot = (root && root.ownerDocument) ? root.ownerDocument : root
@@ -36,11 +38,13 @@ export function bind(adapter, root, source, opts) {
     const what = typeof source === 'string' ? `data-rules-name~="${source}"` : 'the provided rules object'
     throw new Error(`hyper-html-api: could not resolve rules for ${what}`)
   }
-  const { rules, tagNode } = found
+  const { rules, tagNode, version } = found
+  const callOpts = { version, ...opts }
   return {
     rules,
     tagNode,                                                // informational only; null for a literal object
-    get: () => extract(adapter, root, rules, opts),         // opts (skip/templateAttr) forwarded
-    set: (data) => apply(adapter, root, rules, data, opts),
+    version,
+    get: () => extract(adapter, root, rules, callOpts),     // opts (skip/templateAttr/codecs) forwarded
+    set: (data) => apply(adapter, root, rules, data, callOpts),
   }
 }

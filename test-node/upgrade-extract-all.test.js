@@ -54,7 +54,7 @@ test('collectRulesTags: duplicate name warns and keeps the first', () => {
 })
 
 test('collectRulesTags: unsupported data-rules-version throws', () => {
-  const $ = load('<script data-rules-name="api" data-rules-version="2">{"title":"h1"}</script>')
+  const $ = load('<script data-rules-name="api" data-rules-version="3">{"title":"h1"}</script>')
   assert.throws(() => collectRulesTags(cheerioAdapter, $.root()), UnknownRulesVersion)
 })
 

@@ -4,7 +4,7 @@ import {
   coercePropValue,
 } from './dom-properties.js'
 import { WriteNotRoundTripped } from './errors.js'
-import { ruleAttrIndex, splitRule } from './rule-syntax.js'
+import { codecOf, ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName } from './style-vars.js'
 
 // Props whose read-side value keeps its whitespace. Every other text rule reads
@@ -18,22 +18,28 @@ const UNTRIMMED_PROPS = new Set(['textContent', 'innerText'])
 // WriteNotRoundTripped instead of returning a false success. Only the supplied
 // projection is checked: omitted keys and undefined are skipped exactly as the
 // writer skips them, which is what keeps partial updates working.
-export function assertRoundTrip(rules, requested, actual) {
-  check(rules, requested, actual, [])
+// A codec value is compared by its codec's own same(), from `codecs`.
+export function assertRoundTrip(rules, requested, actual, codecs = {}) {
+  check(rules, requested, actual, [], codecs)
 }
 
-function check(rule, want, got, path) {
+function check(rule, want, got, path, codecs) {
   if (want === undefined) return
   if (typeof rule === 'string') {
+    const form = codecOf(rule)
+    if (form) {
+      if (!codecs[form.name].same(want, got)) fail(path)
+      return
+    }
     checkScalarRule(rule, want, got, path)
     return
   }
   if (Array.isArray(rule)) {
-    checkList(rule[1], want, got, path)
+    checkList(rule[1], want, got, path, codecs)
     return
   }
   if (typeof rule === 'object' && rule !== null) {
-    checkObject(rule, want, got, path)
+    checkObject(rule, want, got, path, codecs)
   }
 }
 
@@ -71,16 +77,16 @@ function checkTextList(want, got, path) {
   for (let i = 0; i < want.length; i++) checkText(want[i], got[i], [...path, i])
 }
 
-function checkObject(rule, want, got, path) {
+function checkObject(rule, want, got, path, codecs) {
   if (!isPlainObject(want) || !isPlainObject(got)) fail(path)
   for (const [key, sub] of Object.entries(rule)) {
-    check(sub, want[key], got[key], [...path, key])
+    check(sub, want[key], got[key], [...path, key], codecs)
   }
 }
 
-function checkList(shape, want, got, path) {
+function checkList(shape, want, got, path, codecs) {
   if (!Array.isArray(want) || !Array.isArray(got) || want.length !== got.length) fail(path)
-  for (let i = 0; i < want.length; i++) check(shape, want[i], got[i], [...path, i])
+  for (let i = 0; i < want.length; i++) check(shape, want[i], got[i], [...path, i], codecs)
 }
 
 function checkPropOrAttr(name, want, got, path) {

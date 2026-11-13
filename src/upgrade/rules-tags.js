@@ -1,5 +1,5 @@
 import { parseRelaxed } from '../engine/rules.js'
-import { SUPPORTED_VERSION } from '../engine/rules-tag.js'
+import { SUPPORTED_VERSIONS } from '../engine/rules-tag.js'
 import { UnknownRulesVersion } from '../engine/errors.js'
 
 const RULES_SELECTOR = 'script[data-rules-name]'
@@ -9,7 +9,7 @@ export function normalizeName(raw) {
 }
 
 /**
- * Collect every rules tag under `root` as [{ name, rules }], keyed by the
+ * Collect every rules tag under `root` as [{ name, rules, version }], keyed by the
  * whitespace-normalized data-rules-name attribute value. Duplicate names:
  * first tag wins with a warning (mirrors findRulesIn). Unsupported
  * data-rules-version throws so engine-format skew fails loudly instead of
@@ -29,9 +29,9 @@ export function collectRulesTags(adapter, root) {
       continue
     }
     const version = adapter.attr(tag, 'data-rules-version')
-    if (version !== SUPPORTED_VERSION) throw new UnknownRulesVersion(version)
+    if (!SUPPORTED_VERSIONS.includes(version)) throw new UnknownRulesVersion(version)
     seen.add(name)
-    out.push({ name, rules: parseRelaxed(adapter.text(tag)) })
+    out.push({ name, rules: parseRelaxed(adapter.text(tag)), version })
   }
   return out
 }

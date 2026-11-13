@@ -8,7 +8,7 @@ export class RulesParseError extends Error {
 
 export class UnknownRulesVersion extends Error {
   constructor(version) {
-    super(`unknown rules version: ${version}. Library supports "1".`)
+    super(`unknown rules version: ${version}. Library supports "1" and "2".`)
     this.name = 'UnknownRulesVersion'
     this.version = version
   }
@@ -90,5 +90,24 @@ export class WriteRejected extends Error {
     this.name = 'WriteRejected'
     this.unknownKeys = unknownKeys
     this.unmatched = unmatched
+  }
+}
+
+export class UnknownCodec extends Error {
+  constructor(name) {
+    super(`unknown codec "${name}": no codec by that name is given to this call`)
+    this.name = 'UnknownCodec'
+    this.code = 'unknown-codec'
+    this.codec = name
+  }
+}
+
+// Thrown by a codec that will not take a write, with its own code (for
+// example "sheet-not-canonical"). A client error, like UnknownCodec.
+export class CodecRefused extends Error {
+  constructor(code, message) {
+    super(message)
+    this.name = 'CodecRefused'
+    this.code = code
   }
 }

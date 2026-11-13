@@ -2,6 +2,7 @@ import { parseRelaxed } from './rules.js'
 import { UnknownRulesVersion } from './errors.js'
 
 export const SUPPORTED_VERSION = '1'
+export const SUPPORTED_VERSIONS = ['1', '2']
 const TOKEN_RE = /^[a-zA-Z0-9_-]+$/
 
 // findRulesIn(adapter, root)         → first script[data-rules-name] (tooling/no-token)
@@ -29,12 +30,12 @@ export function findRulesIn(adapter, root, token) {
 
   const tagNode = candidates[0]
   const version = adapter.attr(tagNode, 'data-rules-version')
-  if (version !== SUPPORTED_VERSION) throw new UnknownRulesVersion(version)
+  if (!SUPPORTED_VERSIONS.includes(version)) throw new UnknownRulesVersion(version)
 
   // Script tag bodies accept the same relaxed JSON syntax as the ?data=
   // URL parameter: unquoted keys, single-quoted strings, trailing commas.
   // parseRelaxed tries strict JSON.parse first, so valid JSON keeps
   // parsing identically.
   const rules = parseRelaxed(adapter.text(tagNode))
-  return { rules, tagNode }
+  return { rules, tagNode, version }
 }

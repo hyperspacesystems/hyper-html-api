@@ -10,13 +10,15 @@ import {
   ShapeMismatch,
 } from './errors.js'
 import { listDiff } from './diff.js'
-import { ruleAttrIndex, splitRule } from './rule-syntax.js'
+import { codecOf, ruleAttrIndex, splitRule } from './rule-syntax.js'
 import { isCustomPropertyName, setStyleVar } from './style-vars.js'
+import { checkCodecRules, codecForRule } from './codecs.js'
 
 export function apply(adapter, root, rules, data, opts = {}) {
   if (Object.prototype.hasOwnProperty.call(opts, 'exclude') && adapter.semanticExclude === false) {
     throw new Error('This adapter does not support semantic exclude queries; omit exclude or use the DOM adapter.')
   }
+  checkCodecRules(rules, opts)
   const mismatches = []
   validateShape(rules, data, [], mismatches)
   if (mismatches.length) throw new ShapeMismatch(mismatches)
@@ -61,6 +63,13 @@ function applyScalar(adapter, ctx, rule, value, trace, opts) {
   if (rule.endsWith('[]')) {
     const selector = rule.slice(0, -2)
     listDiff(adapter, ctx, selector, null, value, trace, applyAt, opts)
+    return ctx
+  }
+
+  const codec = codecForRule(rule, opts)
+  if (codec) {
+    const matches = codec.selector ? adapter.find(ctx, codec.selector, opts) : [ctx]
+    if (matches.length) codec.codec.write(adapter, matches[0], value, { query: opts.query })
     return ctx
   }
 
@@ -156,6 +165,8 @@ function validateShape(rule, value, path, mismatches) {
   if (value === undefined) return
 
   if (typeof rule === 'string') {
+    // A codec judges its own value when it writes.
+    if (codecOf(rule)) return
     if (rule.endsWith('[]')) {
       if (!Array.isArray(value)) {
         mismatches.push({ path: pathStr(path), expected: 'array', got: typeofX(value) })

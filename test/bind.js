@@ -65,7 +65,7 @@ describe('findRulesIn (token forms, DOM adapter)', () => {
 
   it('throws UnknownRulesVersion for a matching tag at the wrong version', () => {
     const doc = parseDoc(
-      '<script data-rules-name="api" data-rules-version="2">{"title":"h1"}</script>',
+      '<script data-rules-name="api" data-rules-version="3">{"title":"h1"}</script>',
     )
     chai.expect(() => findRulesIn(domAdapter, doc, 'api')).to.throw()
   })
