@@ -47,7 +47,7 @@ export function writeSite(load, src, store, options = {}) {
   const data = projectSite(found.rules[SITE_KEY], store)
   const keys = Object.keys(data)
   if (keys.length === 0) return { ...none, declared: true }
-  const write = (html, part) => writeDocument(load, html, { [SITE_KEY]: part }, { token, rules: found.rules }).html
+  const write = (html, part) => writeDocument(load, html, { [SITE_KEY]: part }, { token, rules: found.rules, version: found.version }).html
   try {
     const html = write(src, data)
     return { html, changed: html !== src, declared: true, applied: keys, failed: [] }

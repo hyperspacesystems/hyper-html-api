@@ -229,3 +229,15 @@ test('readSite reads every other key when one key has a broken selector', () => 
   assert.equal(Object.hasOwn(read.data, 'brand'), false)
   assert.equal(read.data.logo, 'a.svg')
 })
+
+test('writeSite writes a site value into a version 2 page whose rules use the sheet codec', () => {
+  const src = [
+    '<!doctype html><html><head>',
+    '<script data-rules-name="api" data-rules-version="2">{"title":"h1","site":{"name":"h1"},"sheets":"[items=sheets]@codec(sheet)"}</script>',
+    '</head><body><h1>Book</h1><main items="sheets"></main></body></html>',
+  ].join('')
+  const result = writeSite(load, src, { name: 'Shared name' })
+  assert.deepEqual(result.failed, [])
+  assert.deepEqual(result.applied, ['name'])
+  assert.equal(load(result.html)('h1').text(), 'Shared name')
+})

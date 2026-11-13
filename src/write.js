@@ -18,6 +18,8 @@ import { codecOf } from './engine/rule-syntax.js'
 // EmptyListInsert, UnknownCodec or WriteNotRoundTripped, always before producing
 // any output. options.codecs maps a name to a codec for `@codec(name)` rules,
 // which only a version 2 rules tag may use (default: the sheet codec).
+// options.version sets the rules version for caller-provided options.rules
+// (default '1'); the document's own rules tag always supplies its own.
 export function writeDocument(load, src, data, options = {}) {
   const { token = 'api', codecs = { sheet } } = options
   const $ = load(src, { sourceCodeLocationInfo: true })
@@ -26,6 +28,7 @@ export function writeDocument(load, src, data, options = {}) {
   let version = '1'
   if (Object.prototype.hasOwnProperty.call(options, 'rules')) {
     rules = options.rules
+    if (options.version !== undefined) version = String(options.version)
     if (rules === null || !['string', 'object'].includes(typeof rules)) {
       throw new RulesParseError('Invalid extraction rules: expected a selector, array, or object.')
     }
