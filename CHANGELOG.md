@@ -134,6 +134,11 @@
 
 ## [Unreleased]
 
+## [0.15.2] - 2026-11-13
+
+### Fixed
+- Writing a site value with `writeSite` keeps the page's rules version.
+
 ## [0.15.1] - 2026-11-13
 
 ### Changed
