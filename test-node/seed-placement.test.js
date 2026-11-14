@@ -270,3 +270,38 @@ for (const env of envs) {
     assert.deepEqual(extract(ctx.adapter, ctx.root, rules, OPT), data)
   })
 }
+
+const hasAttr = (ctx, el, name) => {
+  const value = ctx.attr(el, name)
+  return value !== undefined && value !== null
+}
+
+for (const env of envs) {
+  test(`seed placement [${env.label}] — a hidden cms-template seed clones visible rows`, () => {
+    const rules = { items: ['ul > li', '.'] }
+    const html = tag(rules) + '<ul class="todos"><li cms-template hidden></li></ul>'
+    const ctx = env.make(html)
+
+    apply(ctx.adapter, ctx.root, rules, { items: ['first', 'second'] }, OPT)
+
+    const rows = ctx.all('ul.todos > li:not([cms-template])')
+    assert.deepEqual(rows.map(ctx.text), ['first', 'second'])
+    assert.deepEqual(rows.map((el) => hasAttr(ctx, el, 'hidden')), [false, false], 'the added items are visible')
+    assert.ok(hasAttr(ctx, ctx.el('ul.todos > li[cms-template]'), 'hidden'), 'the seed itself stays hidden')
+    assert.deepEqual(extract(ctx.adapter, ctx.root, rules, OPT), { items: ['first', 'second'] })
+  })
+
+  test(`seed placement [${env.label}] — a clone of an ordinary row keeps its hidden attribute`, () => {
+    const rules = { items: ['ul > li', '.'] }
+    const html = tag(rules) + '<ul class="todos"><li hidden>first</li></ul>'
+    const ctx = env.make(html)
+
+    apply(ctx.adapter, ctx.root, rules, { items: ['first', 'second'] }, OPT)
+
+    const rows = ctx.all('ul.todos > li')
+    assert.deepEqual(rows.map(ctx.text), ['first', 'second'])
+    assert.ok(hasAttr(ctx, rows[0], 'hidden'))
+    assert.ok(hasAttr(ctx, rows[1], 'hidden'), 'a row with no template attribute keeps its attributes')
+    assert.deepEqual(extract(ctx.adapter, ctx.root, rules, OPT), { items: ['first', 'second'] })
+  })
+}

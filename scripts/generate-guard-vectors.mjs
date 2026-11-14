@@ -23,11 +23,14 @@ const rows = Array.from({ length: 100 }, (_, i) => [`r${i}`, `item ${i}`, `value
 const base = island([tab(rows)])
 const cases = []
 function add(name, before, after, wantFire, opts = {}) {
-  const { provenance = 'external', pending = true, lane = 'agent', ifMatch = '"v1"' } = opts
+  // A person's own save comes through the page's save lane, never the agent lane, so it is
+  // never a proven reader.
+  const { provenance = 'external', pending = true, lane = provenance.startsWith('ui') ? 'save' : 'agent', ifMatch = '"v1"' } = opts
   const tags = typeof ifMatch === 'string' ? ifMatch.split(',').map(t => t.trim()).filter(Boolean) : []
   const ifMatched = lane === 'agent' && tags.length > 0 && !tags.includes('*')
   const D = core.classifyDestruction(before, after, { codecs })
-  const fire = core.shouldFire(provenance, pending && !ifMatched, before, after, D)
+  // An agent that named the exact version it read is a proven reader (David, 2026-11-13).
+  const fire = core.shouldFire(provenance, pending && !ifMatched, before, after, D, ifMatched)
   assert.equal(fire, wantFire, name)
   cases.push({ name, base: before, inc: after, provenance, pending, lane, ifMatch, D, fire })
 }
@@ -44,28 +47,31 @@ for (const [name, opts, fires] of [
   ['human overwrite', { provenance: 'ui-gestured' }, false],
 ]) add(name, base, island([tab(changed)]), fires, opts)
 const cleared = clone(rows); cleared[0][2] = ''
-add('agent clears one cell with exact version', base, island([tab(cleared)]), true)
+add('agent clears one cell with exact version', base, island([tab(cleared)]), false)
 add('human clears one cell', base, island([tab(cleared)]), false, { provenance: 'ui-gestured' })
-add('agent removes one row', base, island([tab(rows.slice(1))]), true)
+add('agent removes one row', base, island([tab(rows.slice(1))]), false)
+add('agent exact version removes one row of many', base, island([tab(rows.slice(1))]), false)
+const emptied = rows.map(([id]) => [id, '', '', ''])
+add('agent exact version empties every cell', base, island([tab(emptied)]), true)
 add('human removes two rows of 100', base, island([tab(rows.slice(2))]), false, { provenance: 'ui-gestured' })
 add('human removes most rows', base, island([tab(rows.slice(70))]), true, { provenance: 'ui-gestured' })
 add('agent removes tab', base, island([]), true)
 add('human empties tiny sheet', island([tab([['r1', 'only']], ['a'])]), island([]), false, { provenance: 'ui-gestured' })
 add('agent empties tiny sheet', island([tab([['r1', 'only']], ['a'])]), island([]), true)
-add('replaced filled column', island([tab([['r1', 'a', 'b']], ['a', 'b'])]), island([tab([['r1', 'a', 'b']], ['x', 'b'])]), true)
-add('removed filled column and inserted another', island([tab([['r1', 'a', 'b', 'c']])]), island([tab([['r1', 'a', 'c', 'd']], ['a', 'c', 'd'])]), true)
+add('replaced filled column', island([tab([['r1', 'a', 'b']], ['a', 'b'])]), island([tab([['r1', 'a', 'b']], ['x', 'b'])]), false)
+add('removed filled column and inserted another', island([tab([['r1', 'a', 'b', 'c']])]), island([tab([['r1', 'a', 'c', 'd']], ['a', 'c', 'd'])]), false)
 add('removed empty column', island([tab([['r1', 'a', '', 'c']])]), island([tab([['r1', 'a', 'c']], ['a', 'c'])]), false)
-add('cleared and filled with equal count', island([tab([['r1', 'a', '', 'c']])]), island([tab([['r1', '', 'b', 'c']])]), true)
+add('cleared and filled with equal count', island([tab([['r1', 'a', '', 'c']])]), island([tab([['r1', '', 'b', 'c']])]), false)
 add('columns acquire ids', island([tab([['r1', 'a', '', 'c']], ['', '', ''])]), island([tab([['r1', 'a', '', 'c']])]), false)
 const duplicates = [['same', 'first', '', ''], ['same', '', 'second', '']]
 add('duplicate rows reorder', island([tab(duplicates)]), island([tab([...duplicates].reverse())]), false)
-add('duplicate row removed', island([tab(duplicates)]), island([tab(duplicates.slice(1))]), true)
+add('duplicate row removed', island([tab(duplicates)]), island([tab(duplicates.slice(1))]), false)
 const blankIds = [['', 'first', '', ''], ['', '', 'second', '']]
 add('empty row ids reorder', island([tab(blankIds)]), island([tab([...blankIds].reverse())]), false)
-add('empty row id removed', island([tab(blankIds)]), island([tab(blankIds.slice(1))]), true)
+add('empty row id removed', island([tab(blankIds)]), island([tab(blankIds.slice(1))]), false)
 const first = tab([['r1', 'first']], ['a'], 'same'), second = tab([['r1', 'second']], ['a'], 'same')
 add('duplicate tabs reorder', island([first, second]), island([second, first]), false)
-add('duplicate tab removed', island([first, second]), island([second]), true)
+add('duplicate tab removed', island([first, second]), island([second]), false)
 const renamed = clone(base); renamed.api.sheets[0].name = 'Renamed'
 add('tab rename', base, renamed, false)
 const unreadable = clone(base); delete unreadable.api.sheets; unreadable['@codecs'].api.sheets = 'unknown'

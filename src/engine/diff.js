@@ -36,7 +36,10 @@ export function listDiff(adapter, parentCtx, selector, shape, newItems, trace, a
   let template = null
   if (needsTemplate && templateSource) {
     template = adapter.clone(templateSource)
+    const seed = opts.templateAttr && adapter.attr(templateSource, opts.templateAttr) != null
     if (opts.templateAttr) adapter.removeAttr(template, opts.templateAttr)
+    // A seed is often hidden with the hidden attribute; its clones are real items.
+    if (seed) adapter.removeAttr(template, 'hidden')
     const stripped = adapter.stripIds(template)
     if (stripped > 0) {
       // eslint-disable-next-line no-console
