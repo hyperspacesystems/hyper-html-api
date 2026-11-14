@@ -134,6 +134,14 @@
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-14
+
+### Added
+- A sheet patch with `{ sheet, delete: true }` now deletes a tab.
+
+### Fixed
+- Seeded rows are cloned into place and keep their hidden seed.
+
 ## [0.15.2] - 2026-11-13
 
 ### Fixed
