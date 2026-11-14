@@ -174,6 +174,29 @@ An invalid explicit value throws `RulesParseError`; it never falls back to the t
   returns the source untouched with `changed: false`.
 - `no-data` and `editor-ui` regions are invisible to writes, as they are to reads.
 
+### Patching sheets
+
+Whole-sheet writes with `writeDocument` remain unavailable; patch sheets explicitly with `patchDocument(load, src, patch, options?)`. Documents opt into one `@codec(sheet)` rule in a version 2 rules tag, typically `{ sheets: '[items=sheets]@codec(sheet)' }`. `options.token` defaults to `'api'`, and `options.newId()` supplies deterministic appended-row ids.
+
+```js
+import { patchDocument } from 'hyper-html-api/write'
+import * as cheerio from 'cheerio'
+
+const edited = patchDocument(cheerio.load, src, [
+  { range: 'B3', values: [[450]] },
+  { sheet: 'Sales', append: [['Porto', 12]] },
+])
+const pruned = patchDocument(cheerio.load, edited.html, [
+  { sheet: 'Archive', delete: true },
+])
+```
+
+Operations are `{ sheet?, range, values }`, `{ sheet?, append }`, or `{ sheet, delete: true }`. `sheet` resolves tab name first, then id; omitting it selects the first tab for `range` and `append`, while deletion requires `sheet` and `delete` set to `true`. Delete removes the entire `<section item>` tab, changing nothing around it except needed `stale` attributes on surviving tables. A noncanonical target table can be deleted since its cells are not rewritten, and untouched noncanonical surviving tabs do not block deletion, whereas cell writes still need canonical table bytes. A target lacking an explicit closing `</section>` is refused with `sheet-not-canonical` to avoid deleting an inferred parser span.
+
+Calls return `{ html, changed, stale }` with no host calculation: ordinary cell writes intentionally change cell values and formulas, while deletion and its `stale` marking leave surviving formula text and cached values unchanged. Only removed sections, patched table rows, and necessary `stale` attributes change. `changed` keeps `cells` and `rows` counts and adds `sheets` only when tabs are deleted, without counting removed cells or rows as cell or row writes. Cell-patched survivors are `stale` as before. Pure deletion has `stale: false` if surviving tabs have no formulas; otherwise all surviving formula-bearing tables, including local formulas and already `stale` tables, are conservatively marked `stale` until the browser recalculates.
+
+Errors throw before output: `NoRulesTag`, `RulesParseError`, `UnknownCodec`, `CodecRefused` (`no-sheet` maps to HTTP 400; only `sheet-not-canonical` maps to HTTP 409), and `QueryRefused` (`bad_value`, `bad_range`, `outside_sheet`, `covered_cell`, `unknown_sheet`, `last_sheet`, `bad_patch`). `last_sheet` refuses if no tab would remain; `unknown_sheet` refuses an unresolved target. `bad_patch` refuses missing `sheet` or a wrong `delete` value with distinct messages, and refuses mixed operations (`delete` combined with `range`, `append`, or `values`) or same-tab conflicts (any second operation resolving to the deleted tab by name, id, or omitted first-tab selector before or after deletion) with a message asking to send the delete on its own. Multiple deletes of different tabs are allowed if one tab remains.
+
 ## License
 
 MIT-0 (MIT No Attribution).

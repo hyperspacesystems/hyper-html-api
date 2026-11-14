@@ -43,17 +43,19 @@ export function treeAdapter(adapter) {
 
 const childMatching = (adapter, node, selector) => adapter.children(node).find((child) => adapter.matches(child, selector))
 
-// Each tab under the container: { id, name, table } (table is null when the
-// section has none). Shared by reads and by patchDocument.
+// Each tab under the container: { id, name, section, table } (table is null when the
+// section has none). A cms-template seed or a sapjs template item is not a tab: it is
+// the shape a new tab is cloned from. Shared by reads and by patchDocument.
 export function tabNodes(adapter, node) {
   const tree = treeAdapter(adapter)
   return adapter.children(node)
-    .filter((child) => adapter.matches(child, 'section[item]'))
+    .filter((child) => adapter.matches(child, 'section[item]') && adapter.attr(child, 'cms-template') == null && adapter.attr(child, 'template') == null)
     .map((section) => {
       const heading = childMatching(adapter, section, 'h2[bind="name"]')
       return {
         id: adapter.attr(section, 'data-id') ?? '',
         name: heading ? tree.text(heading) : '',
+        section,
         table: childMatching(adapter, section, 'table[grid]') ?? null,
       }
     })

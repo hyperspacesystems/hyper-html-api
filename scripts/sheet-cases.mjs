@@ -241,8 +241,35 @@ write('sheet-patch-no-sheet-rule', {
   note: 'a document with no sheets rule cannot be patched',
 })
 
+const DELETE_TABLE = '<table grid><colgroup><col data-id="c1" data-pos="V"></colgroup><tbody><tr data-id="r1" data-pos="V"><td n v="7">7</td></tr></tbody></table>'
+const deleteDoc = (inner) => `<!doctype html>\n<html><head>${TAG.replace('"title":"h1",', '')}</head><body data-note='keep &amp; me'>\n<!-- before -->\n<div items="sheets">\n${inner}\n</div>\n<!-- after -->\n</body></html>`
+const DELETE_A = sec('s1', 'Budget', DELETE_TABLE)
+const DELETE_B = sec('s2', 'Notes', DELETE_TABLE)
+const DELETE_C = sec('s3', 'Archive', DELETE_TABLE)
+const DELETE_THREE = deleteDoc(`${DELETE_A}\n${DELETE_B}\n${DELETE_C}`)
+const DELETE_FORMULAS = deleteDoc(`${DELETE_A}\n${sec('s2', 'Notes', DELETE_TABLE.replace('<td n v="7">', '<td n f="=Budget!A1" v="7">').replace('</tbody>', '<tr data-id="r2" data-pos="V"><td n f="=SUM(A1:A2)" v="3">3</td></tr></tbody>'))}\n${DELETE_C}`)
+const DELETE_UNCLOSED = deleteDoc(`${DELETE_A}\n${DELETE_B}\n${DELETE_C.replace('</section>', '')}`)
+const DELETE_ONLY = deleteDoc(DELETE_A)
+const DELETE_EDITED = deleteDoc(`${sec('s1', 'Budget', DELETE_TABLE.replace('<table grid>', '<table grid class="wide" data-q="1">').replace('>7</td>', '><b>7</b></td>'))}\n${DELETE_B}\n${DELETE_C}`)
+
+write('sheet-patch-delete-by-id', { html: DELETE_THREE, face: 'patch', expect: 'ok', data: [{"sheet": "s2", "delete": true}], note: "a tab id names the same tab its data-id does" })
+write('sheet-patch-delete-by-name', { html: DELETE_THREE, face: 'patch', expect: 'ok', data: [{"sheet": "Budget", "delete": true}], note: "deleting a tab by name removes exactly its section" })
+write('sheet-patch-delete-conflict-after', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"sheet": "Budget", "delete": true}, {"sheet": "s1", "append": [[1]]}], note: "either order of the same-tab conflict is refused" })
+write('sheet-patch-delete-conflict-before', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"sheet": "Budget", "range": "A1", "values": [[1]]}, {"sheet": "Budget", "delete": true}], note: "a delete beside another operation on the same tab is refused" })
+write('sheet-patch-delete-formula-stale', { html: DELETE_FORMULAS, face: 'patch', expect: 'ok', data: [{"sheet": "Budget", "delete": true}], note: "a surviving table with a formula is marked stale by one inserted attribute" })
+write('sheet-patch-delete-invalid-value', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"sheet": "Budget", "delete": "true"}], note: "delete must be exactly true, not a string that looks true" })
+write('sheet-patch-delete-last', { html: DELETE_THREE, face: 'patch', expect: 'ok', data: [{"sheet": "Archive", "delete": true}], note: "the last tab on the page is deleted like any other" })
+write('sheet-patch-delete-missing-sheet', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"delete": true}], note: "a delete has to name the tab it removes" })
+write('sheet-patch-delete-mixed', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"sheet": "Budget", "delete": true, "range": "A1", "values": [[1]]}], note: "a delete cannot carry a range, append, or values" })
+write('sheet-patch-delete-noncanonical', { html: DELETE_UNCLOSED, face: 'patch', expect: 'error', data: [{"sheet": "Archive", "delete": true}], note: "a target with no explicit closing tag is refused: an inferred span is not a section" })
+write('sheet-patch-delete-only', { html: DELETE_ONLY, face: 'patch', expect: 'error', data: [{"sheet": "Budget", "delete": true}], note: "deleting the only tab is refused: a document keeps at least one tab" })
+write('sheet-patch-delete-outside-edited', { html: DELETE_EDITED, face: 'patch', expect: 'ok', data: [{"sheet": "Budget", "delete": true}], note: "a table edited outside the editor can still be deleted" })
+write('sheet-patch-delete-two', { html: DELETE_THREE, face: 'patch', expect: 'ok', data: [{"sheet": "Budget", "delete": true}, {"sheet": "Archive", "delete": true}], note: "two deletes in one call leave the tab between them" })
+write('sheet-patch-delete-unknown', { html: DELETE_THREE, face: 'patch', expect: 'error', data: [{"sheet": "Nope", "delete": true}], note: "a delete of a tab that is not there is refused" })
+write('sheet-patch-delete-with-survivor-write', { html: DELETE_FORMULAS, face: 'patch', expect: 'ok', data: [{"sheet": "Budget", "delete": true}, {"sheet": "Notes", "range": "A1", "values": [["x"]]}], note: "a delete and a write to another tab apply together" })
+
 // ---------- write face ----------
-write('sheet-write-whole-refused', { html: TWO, face: 'write', expect: 'error', data: { sheets: [] }, note: 'replacing a sheet as a whole value is refused with 409; send patch operations' })
+write('sheet-write-whole-refused', { html: TWO, face: 'write', expect: 'error', data: { sheets: [{ id: 's1', name: 'Budget' }, { id: 's2', name: 'Styled' }] }, note: 'replacing a sheet as a whole value is refused with 409 even when every tab is kept; send patch operations' })
 
 // Tab names are kept exactly as written, spaces included, and looked up exactly: a host that
 // trims names would read " Budget " as "Budget" and answer both lookups differently.

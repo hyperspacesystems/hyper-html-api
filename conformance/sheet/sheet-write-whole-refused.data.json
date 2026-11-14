@@ -1,6 +1,12 @@
 {
   "sheets": [
-    { "id": "s1", "name": "Budget" },
-    { "id": "s2", "name": "Styled" }
+    {
+      "id": "s1",
+      "name": "Budget"
+    },
+    {
+      "id": "s2",
+      "name": "Styled"
+    }
   ]
 }
