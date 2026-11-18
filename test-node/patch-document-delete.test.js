@@ -181,12 +181,12 @@ test('a delete and a write to a survivor succeed in either order', () => {
   ])
   for (const out of [writeThenDelete, deleteThenWrite]) {
     assert.deepEqual(out.changed, { cells: 1, rows: 0, sheets: 1 })
-    assert.equal(out.stale, true)
+    assert.equal(out.stale, false)
     assert.equal(out.html, writeThenDelete.html)
     assert.equal(out.html.includes(a), false)
     assert.equal(out.html.includes(c), true)
     assert.deepEqual(tabs(out.html), [
-      { id: 's2', name: 'Notes', cols: ['c1'], rows: [{ id: 'r1', cells: ['x'] }], stale: true },
+      { id: 's2', name: 'Notes', cols: ['c1'], rows: [{ id: 'r1', cells: ['x'] }] },
       { id: 's3', name: 'Archive', cols: ['c1'], rows: [{ id: 'r1', cells: [{ v: 7 }] }] },
     ])
   }

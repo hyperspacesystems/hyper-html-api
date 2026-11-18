@@ -103,29 +103,30 @@ function groupStarts(rows, groupSize = 50) {
   }
   return starts;
 }
-function tableHtml(sheet, { groupSize = 50 } = {}) {
+function tableParts(sheet, { groupSize = 50, line = rowHtml } = {}) {
   count(groupSize, 1, "groupSize");
   const rows = sheet.rows ?? [];
   const firstData = rows.findIndex((row) => !row.frozen);
   const frozen = firstData === -1 ? rows : rows.slice(0, firstData);
   const data = firstData === -1 ? [] : rows.slice(firstData);
   if (data.some((row) => row.frozen)) throw new TypeError("grid codec: frozen rows come before every other row");
-  let html = "<table grid";
-  if (sheet.freezeCols) html += ` freeze-cols="${count(sheet.freezeCols, 1, "freezeCols")}"`;
-  if (sheet.stale) html += " stale";
-  html += `><colgroup>${(sheet.cols ?? []).map(colHtml).join("")}</colgroup>
+  let head = "<table grid";
+  if (sheet.freezeCols) head += ` freeze-cols="${count(sheet.freezeCols, 1, "freezeCols")}"`;
+  if (sheet.stale) head += " stale";
+  head += `><colgroup>${(sheet.cols ?? []).map(colHtml).join("")}</colgroup>
 `;
-  if (frozen.length > 0) html += `<thead>
-${frozen.map(rowHtml).join("\n")}
+  if (frozen.length > 0) head += `<thead>
+${frozen.map(line).join("\n")}
 </thead>`;
-  const starts = groupStarts(data, groupSize);
-  for (let g = 0; g < starts.length; g++) {
-    const group = data.slice(starts[g], starts[g + 1] ?? data.length);
-    html += "<tbody>\n";
-    if (group.length > 0) html += `${group.map(rowHtml).join("\n")}
-`;
-    html += "</tbody>";
-  }
+  return { head, data, starts: groupStarts(data, groupSize) };
+}
+var groupHtml = (group, line = rowHtml) => `<tbody>
+${group.length > 0 ? `${group.map(line).join("\n")}
+` : ""}</tbody>`;
+function tableHtml(sheet, { groupSize = 50 } = {}) {
+  const { head, data, starts } = tableParts(sheet, { groupSize });
+  let html = head;
+  for (let g = 0; g < starts.length; g++) html += groupHtml(data.slice(starts[g], starts[g + 1] ?? data.length));
   return `${html}</table>`;
 }
 
@@ -683,7 +684,11 @@ function readGrid(src) {
   }
   return grid;
 }
-function applyRange(grid, op, edited) {
+var needsDraw = (cell, col) => {
+  const fmt = cell?.fmt ?? col?.fmt;
+  return cell?.n === true && fmt !== void 0 && fmt !== "" && fmt !== "@";
+};
+function applyRange(grid, op, edited, marks) {
   checkGrid(op.values, "values");
   const { r0, c0, r1, c1 } = parseRange(op.range);
   const height = op.values.length;
@@ -705,6 +710,7 @@ function applyRange(grid, op, edited) {
       if (old && old.hidden) throw new QueryRefused("covered_cell", `range ${op.range} writes into a merged cell's covered position`);
       while (row.cells.length <= col) row.cells.push(null);
       row.cells[col] = setCell(old, value);
+      if (needsDraw(row.cells[col], grid.cols[col])) marks.draw = true;
       cells++;
     });
     edited.set(index, row);
@@ -722,10 +728,11 @@ function patchGrid(src, ops, { newId = randomId } = {}) {
   const ids = /* @__PURE__ */ new Set([...grid.rows.map(({ row }) => row.id), ...grid.cols.map((col) => col.id)]);
   const edited = /* @__PURE__ */ new Map();
   const appended = [];
+  const marks = { draw: false };
   let cells = 0;
   for (const op of ops) {
     if (op && typeof op.range === "string" && op.append === void 0) {
-      cells += applyRange(grid, op, edited);
+      cells += applyRange(grid, op, edited, marks);
     } else if (op && op.append !== void 0 && op.range === void 0) {
       checkGrid(op.append, "append");
       for (const values of op.append) {
@@ -735,15 +742,18 @@ function patchGrid(src, ops, { newId = randomId } = {}) {
         ids.add(id);
         const row = { id, pos: keyBetween(lastKey(grid, appended), null), cells: values.map((value) => setCell(null, value)) };
         cells += row.cells.filter(Boolean).length;
+        if (row.cells.some((cell, c) => needsDraw(cell, grid.cols[c]))) marks.draw = true;
         appended.push(row);
       }
     } else {
       throw new QueryRefused("bad_patch", "an operation is { range, values } or { append }");
     }
   }
+  const after = [...grid.rows.map(({ row }, index) => edited.get(index) ?? row), ...appended];
+  const stale = grid.table.stale === true || marks.draw || after.some((row) => row.cells.some((cell) => cell?.f !== void 0));
   const edits = [];
   const { freezeCols } = grid.table;
-  edits.push({ start: 0, end: grid.startEnd, bytes: `<table grid${freezeCols ? ` freeze-cols="${freezeCols}"` : ""} stale>` });
+  edits.push({ start: 0, end: grid.startEnd, bytes: `<table grid${freezeCols ? ` freeze-cols="${freezeCols}"` : ""}${stale ? " stale" : ""}>` });
   for (const [index, row] of edited) edits.push({ start: grid.rows[index].start, end: grid.rows[index].end, bytes: rowHtml(row) });
   if (appended.length > 0) {
     const last = grid.groups[grid.groups.length - 1];
@@ -772,7 +782,90 @@ ${rest.slice(i, i + GROUP_SIZE).map((row) => `${rowHtml(row)}
     from = edit.end;
   }
   out += src.slice(from);
-  return { bytes: out, changed: { cells, rows: appended.length } };
+  return { bytes: out, changed: { cells, rows: appended.length }, stale };
+}
+
+// src/grid/codec/cached-writer.js
+var KNOWN = ["rows", "cols", "cells", "results", "rescanned", "structure"];
+function withExtras(sheetId, row, cols, extras) {
+  if (!extras) return row;
+  let cells = null;
+  row.cells.forEach((cell, c) => {
+    if (!cell || cell.f === void 0 || cell.hidden || cols[c] === void 0) return;
+    const extra = extras(sheetId, row.id, cols[c].id);
+    if (extra === void 0) return;
+    cells ??= row.cells.slice();
+    const next = { ...cell, text: extra.text };
+    for (const key of ["v", "n", "t"]) {
+      if (extra[key] === void 0 || extra[key] === false) delete next[key];
+      else next[key] = extra[key];
+    }
+    cells[c] = next;
+  });
+  return cells ? { ...row, cells } : row;
+}
+var listed = (part) => Array.isArray(part) ? part : [...part?.added ?? [], ...part?.removed ?? [], ...part?.changed ?? []];
+var rowOf = (entry) => typeof entry === "string" ? entry : entry.row;
+function createSheetWriter({ groupSize = 50 } = {}) {
+  tableParts({}, { groupSize });
+  const tabs = /* @__PURE__ */ new Map();
+  const tabOf = (sheetId) => {
+    let tab = tabs.get(sheetId);
+    if (!tab) {
+      tab = { groups: /* @__PURE__ */ new Map(), groupOf: /* @__PURE__ */ new Map(), extras: null };
+      tabs.set(sheetId, tab);
+    }
+    return tab;
+  };
+  function dropRow(tab, rowId) {
+    const key = tab.groupOf.get(rowId);
+    if (key === void 0) return;
+    tab.groups.delete(key);
+    tab.groupOf.delete(rowId);
+  }
+  function touch(sheetId, changes) {
+    if (changes && !KNOWN.some((key) => key in changes)) throw new TypeError("grid codec: touch takes apply's changes or a Grid change event");
+    const tab = tabs.get(sheetId);
+    if (!tab) return;
+    const lists = changes && (changes.rows !== void 0 || changes.cols !== void 0);
+    if (!changes || changes.rescanned || changes.structure && !lists || listed(changes.cols).length > 0) {
+      tabs.delete(sheetId);
+      return;
+    }
+    for (const entry of listed(changes.rows)) dropRow(tab, rowOf(entry));
+    for (const change of changes.cells ?? []) dropRow(tab, change.row);
+    for (const change of changes.results ?? []) dropRow(tab, change.row);
+  }
+  function table(sheetId, sheet, extras = null) {
+    let tab = tabOf(sheetId);
+    if (tab.extras !== extras) {
+      tabs.delete(sheetId);
+      tab = tabOf(sheetId);
+      tab.extras = extras;
+    }
+    const cols = sheet.cols ?? [];
+    const line = (row) => rowHtml(withExtras(sheetId, row, cols, extras));
+    const { head, data, starts } = tableParts(sheet, { groupSize, line });
+    let html = head;
+    const distinct = new Set(data.map((row) => row.id)).size === data.length;
+    const groups = /* @__PURE__ */ new Map();
+    const groupOf = /* @__PURE__ */ new Map();
+    for (let g = 0; g < starts.length; g++) {
+      const group = data.slice(starts[g], starts[g + 1] ?? data.length);
+      const key = group.map((row) => row.id).join("\n");
+      let bytes = distinct ? tab.groups.get(key) : void 0;
+      bytes ??= groupHtml(group, line);
+      if (distinct) {
+        groups.set(key, bytes);
+        for (const row of group) groupOf.set(row.id, key);
+      }
+      html += bytes;
+    }
+    tab.groups = groups;
+    tab.groupOf = groupOf;
+    return `${html}</table>`;
+  }
+  return { table, touch };
 }
 
 // src/grid/codec/digest.js
@@ -880,6 +973,7 @@ export {
   cellValue,
   colHtml,
   columnIds,
+  createSheetWriter,
   cutGrids,
   domAdapter,
   filterStyle,

@@ -155,3 +155,36 @@ test('a write into a hidden row keeps every hidden row and column hidden', () =>
   assert.match(out.html, /<tr data-id="h-r4" data-pos="l" hidden><\/tr>/)
   assert.match(out.html, /<col data-id="h-c0" data-pos="G" hidden style="width:90px"><col data-id="h-c1" data-pos="V" fmt="0%" hidden>/)
 })
+
+test('a text write into a workbook with no formula leaves it unmarked and answers stale false', () => {
+  const src = doc(sec('s2', 'Styled', table('styled')) + sec('s3', 'Hidden', table('hidden')))
+  const out = patch(src, [{ sheet: 'Styled', range: 'A2', values: [['note']] }])
+  assert.deepEqual(range(out.html, 'Styled', 'A2'), [['note']])
+  assert.equal(out.stale, false)
+  assert.equal(out.html.includes(' stale'), false)
+})
+
+test('a write beside a tab with a formula marks that tab stale, since its formula may read the written cell', () => {
+  const out = patch(SRC, [{ sheet: 'Styled', range: 'A2', values: [['note']] }])
+  assert.equal(out.stale, true)
+  const read = readDocument(cheerio.load, out.html)
+  assert.equal(read.data.sheets[0].stale, true)
+  assert.equal(read.data.sheets[1].stale, undefined)
+  assert.equal(read.fast, true)
+})
+
+test('a write beside a hand-edited tab with a formula marks that tab with one inserted attribute', () => {
+  const src = doc(sec('s1', 'Budget', EDITED_TINY) + sec('s2', 'Styled', table('styled')))
+  const out = patch(src, [{ sheet: 'Styled', range: 'A2', values: [['note']] }])
+  assert.equal(out.stale, true)
+  assert.equal(out.html.includes(EDITED_TINY.replace('<table grid freeze-cols="1">', '<table grid freeze-cols="1" stale>')), true)
+  assert.deepEqual(range(out.html, 'Styled', 'A2'), [['note']])
+})
+
+test('a write beside a tab already marked stale answers stale true', () => {
+  const marked = table('styled').replace('<table grid freeze-cols="2">', '<table grid freeze-cols="2" stale>')
+  const src = doc(sec('s2', 'Styled', marked) + sec('s3', 'Hidden', table('hidden')))
+  const out = patch(src, [{ sheet: 'Hidden', range: 'A2', values: [['note']] }])
+  assert.equal(out.stale, true)
+  assert.equal(out.html.includes(marked), true)
+})

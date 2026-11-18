@@ -31,11 +31,13 @@ export const NOT_CANONICAL_MESSAGE =
 // writes intentionally change cell values and formulas, while deletion and its
 // `stale` marking leave surviving formula text and cached values unchanged.
 // `changed` has `{ cells, rows }` and adds `sheets` only when tabs are deleted;
-// removed cells and rows are not counted as writes. Cell-patched tables set
-// `stale: true`. Pure deletion returns `stale: false` when surviving tabs have
-// no formulas; otherwise every surviving formula-bearing table (including local
-// formulas and already `stale` tables) is marked `stale` until a browser
-// recalculates.
+// removed cells and rows are not counted as writes. A host cannot recalculate or
+// draw formats, so a cell-patched table is marked `stale` when it holds a formula
+// or the patch wrote a number into a cell or column with a format, and every
+// untouched surviving table holding a formula (it may read the written cells or a
+// deleted tab) is marked `stale` until a browser recalculates. A mark already
+// there stays. `stale` is false only when no table this patch wrote or kept holds
+// a formula and no written number needs a format drawn.
 //
 // Throws before producing output: NoRulesTag; RulesParseError or UnknownCodec
 // for a rules tag that cannot hold a sheet; CodecRefused 'no-sheet' (hosts
@@ -58,23 +60,13 @@ export function patchDocument(load, src, patch, options = {}) {
     throw new QueryRefused('bad_patch', 'patch is a non-empty list of operations')
   }
   const deleting = patch.some((op) => op && Object.hasOwn(op, 'delete'))
-  const tabs = locateTabs(load, src, token, deleting)
-  const groups = new Map()
-  for (const op of patch) {
-    if (!op || typeof op !== 'object' || Array.isArray(op)) {
-      throw new QueryRefused('bad_patch', 'an operation is { sheet, range, values }, { sheet, append }, or { sheet, delete: true }')
-    }
-    if (Object.hasOwn(op, 'delete')) {
-      if (op.delete !== true) throw new QueryRefused('bad_patch', 'delete must be exactly true')
-      if (op.sheet === undefined) throw new QueryRefused('bad_patch', 'delete requires a sheet name or id')
-      if (['range', 'append', 'values'].some((key) => Object.hasOwn(op, key))) {
-        throw new QueryRefused('bad_patch', 'delete cannot include range, append, or values; send the delete on its own')
-      }
-    }
-    const { sheet: wanted, ...gridOp } = op
-    const tab = pickTab(tabs, wanted)
-    if (!groups.has(tab)) groups.set(tab, [])
-    groups.get(tab).push(gridOp)
+  let tabs = locateTabs(load, src, token, deleting)
+  let groups = groupOps(tabs, patch)
+  // An untouched tab may hold a formula reading the written cells; a fast-route tab
+  // whose table is not canonical has no bytes to check, so read the source again.
+  if (!deleting && tabs.some((tab) => !groups.has(tab) && tab.hasTable && !tab.region && !tab.table)) {
+    tabs = locateTabs(load, src, token, true)
+    groups = groupOps(tabs, patch)
   }
 
   const deleted = new Set()
@@ -101,29 +93,63 @@ export function patchDocument(load, src, patch, options = {}) {
       continue
     }
     if (!tab.region) throw new CodecRefused('sheet-not-canonical', NOT_CANONICAL_MESSAGE)
-    const { bytes, changed } = patchGrid(src.slice(tab.region.start, tab.region.end), ops, newId ? { newId } : {})
-    edits.push({ ...tab.region, bytes })
-    cells += changed.cells
-    rows += changed.rows
-    stale = true
+    const result = patchGrid(src.slice(tab.region.start, tab.region.end), ops, newId ? { newId } : {})
+    edits.push({ ...tab.region, bytes: result.bytes })
+    cells += result.changed.cells
+    rows += result.changed.rows
+    if (result.stale) stale = true
   }
-  if (deleted.size > 0) {
-    for (const tab of tabs) {
-      if (groups.has(tab) || !tab.table?.find('[f]').length) continue
-      stale = true
-      if (tab.table.attr('stale') !== undefined) continue
-      const location = tab.table.get(0).sourceCodeLocation
-      const end = location.startTag.endOffset - 1
-      const slashInValue = Object.values(location.attrs).some((attr) => attr.endOffset === end)
-      const at = src[end - 1] === '/' && !slashInValue ? end - 1 : end
-      edits.push({ start: at, end: at, bytes: ' stale' })
-    }
+  for (const tab of tabs) {
+    if (groups.has(tab)) continue
+    const at = staleAt(tab, src)
+    if (at === undefined) continue
+    stale = true
+    if (at !== null) edits.push({ start: at, end: at, bytes: ' stale' })
   }
 
   edits.sort((a, b) => b.start - a.start)
   let html = src
   for (const edit of edits) html = html.slice(0, edit.start) + edit.bytes + html.slice(edit.end)
   return { html, changed: { cells, rows, ...(deleted.size ? { sheets: deleted.size } : {}) }, stale }
+}
+
+function groupOps(tabs, patch) {
+  const groups = new Map()
+  for (const op of patch) {
+    if (!op || typeof op !== 'object' || Array.isArray(op)) {
+      throw new QueryRefused('bad_patch', 'an operation is { sheet, range, values }, { sheet, append }, or { sheet, delete: true }')
+    }
+    if (Object.hasOwn(op, 'delete')) {
+      if (op.delete !== true) throw new QueryRefused('bad_patch', 'delete must be exactly true')
+      if (op.sheet === undefined) throw new QueryRefused('bad_patch', 'delete requires a sheet name or id')
+      if (['range', 'append', 'values'].some((key) => Object.hasOwn(op, key))) {
+        throw new QueryRefused('bad_patch', 'delete cannot include range, append, or values; send the delete on its own')
+      }
+    }
+    const { sheet: wanted, ...gridOp } = op
+    const tab = pickTab(tabs, wanted)
+    if (!groups.has(tab)) groups.set(tab, [])
+    groups.get(tab).push(gridOp)
+  }
+  return groups
+}
+
+// Where an untouched tab's table takes a ` stale` attribute: null when it is already
+// marked, undefined when it holds no formula (or no table), else the offset in src.
+function staleAt(tab, src) {
+  if (tab.region) {
+    const bytes = src.slice(tab.region.start, tab.region.end)
+    const end = tab.region.start + bytes.indexOf('>')
+    if (src.slice(tab.region.start, end).endsWith(' stale')) return null
+    return bytes.includes(' f="') ? end : undefined
+  }
+  if (!tab.table) return undefined
+  if (tab.table.attr('stale') !== undefined) return null
+  if (!tab.table.find('[f]').length) return undefined
+  const location = tab.table.get(0).sourceCodeLocation
+  const end = location.startTag.endOffset - 1
+  const slashInValue = Object.values(location.attrs).some((attr) => attr.endOffset === end)
+  return src[end - 1] === '/' && !slashInValue ? end - 1 : end
 }
 
 // [{ id, name, region: { start, end } | null }]: region is where the tab's
@@ -141,7 +167,7 @@ function locateTabs(load, src, token, deleting) {
     const container = sheetContainer(root, found)
     if (holesHold($, root, found.rules, 'sheet', marker, regions.length)) {
       return tabNodes(cheerioAdapter, container).map(({ id, name, table }) => ({
-        id, name, region: table ? holeRegion(table, marker, regions) : null,
+        id, name, hasTable: Boolean(table), region: table ? holeRegion(table, marker, regions) : null,
       }))
     }
   }
@@ -151,7 +177,7 @@ function locateTabs(load, src, token, deleting) {
   if (!found) throw new NoRulesTag(token)
   const container = sheetContainer(root, found)
   return tabNodes(cheerioAdapter, container).map(({ id, name, section, table }) => ({
-    id, name, section, table, region: table ? scannedRegion(table, src) : null,
+    id, name, section, table, hasTable: Boolean(table), region: table ? scannedRegion(table, src) : null,
   }))
 }
 
