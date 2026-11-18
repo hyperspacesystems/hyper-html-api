@@ -79,14 +79,29 @@ function cellHtml(cell) {
 function rowHtml(row) {
   const cells = row.cells.map(cellHtml);
   while (cells.length > 0 && cells[cells.length - 1] === EMPTY_CELL) cells.pop();
+  const hidden = row.hidden ? " hidden" : "";
   const style = row.style !== void 0 ? attr("style", row.style) : "";
-  return `<tr${attr("data-id", row.id)}${attr("data-pos", row.pos)}${style}>${cells.join("")}</tr>`;
+  return `<tr${attr("data-id", row.id)}${attr("data-pos", row.pos)}${hidden}${style}>${cells.join("")}</tr>`;
 }
 function colHtml(col) {
   let attrs = attr("data-id", col.id) + attr("data-pos", col.pos);
   if (col.fmt !== void 0) attrs += attr("fmt", col.fmt);
+  if (col.hidden) attrs += " hidden";
   if (col.width !== void 0) attrs += ` style="width:${count(col.width, 0, "width")}px"`;
   return `<col${attrs}>`;
+}
+function groupStarts(rows, groupSize = 50) {
+  const starts = [0];
+  let start = 0;
+  let open = 0;
+  for (let r = 0; r < rows.length; r++) {
+    if (r - start >= groupSize && open <= r) {
+      starts.push(r);
+      start = r;
+    }
+    for (const cell of rows[r].cells ?? []) if (cell && cell.rowspan > 1 && r + cell.rowspan > open) open = r + cell.rowspan;
+  }
+  return starts;
 }
 function tableHtml(sheet, { groupSize = 50 } = {}) {
   count(groupSize, 1, "groupSize");
@@ -103,9 +118,9 @@ function tableHtml(sheet, { groupSize = 50 } = {}) {
   if (frozen.length > 0) html += `<thead>
 ${frozen.map(rowHtml).join("\n")}
 </thead>`;
-  const groups = Math.max(1, Math.ceil(data.length / groupSize));
-  for (let g = 0; g < groups; g++) {
-    const group = data.slice(g * groupSize, (g + 1) * groupSize);
+  const starts = groupStarts(data, groupSize);
+  for (let g = 0; g < starts.length; g++) {
+    const group = data.slice(starts[g], starts[g + 1] ?? data.length);
     html += "<tbody>\n";
     if (group.length > 0) html += `${group.map(rowHtml).join("\n")}
 `;
@@ -181,6 +196,10 @@ function readCol(src, i) {
     col.fmt = readAval(src, i + 6);
     i = cursor;
   }
+  if (flag(src, i, " hidden")) {
+    col.hidden = true;
+    i += 7;
+  }
   if (src.startsWith(' style="width:', i)) {
     col.width = readCount(src, i + 14, 0);
     i = expect(src, cursor, 'px"');
@@ -253,6 +272,10 @@ function readRow(src, i, frozen) {
   row.pos = readAval(src, i);
   i = cursor;
   if (frozen) row.frozen = true;
+  if (flag(src, i, " hidden")) {
+    row.hidden = true;
+    i += 7;
+  }
   if (src.startsWith(' style="', i)) {
     row.style = readAval(src, i + 8);
     i = cursor;
@@ -512,6 +535,7 @@ function cellModel(adapter, td) {
 function rowModel(adapter, tr, frozen) {
   const row = { id: cleanText(adapter.attr(tr, "data-id") ?? ""), pos: cleanText(adapter.attr(tr, "data-pos") ?? "") };
   if (frozen) row.frozen = true;
+  if (has(adapter, tr, "hidden")) row.hidden = true;
   const style = adapter.attr(tr, "style");
   if (style !== null) row.style = cleanText(style);
   row.cells = adapter.children(tr).filter((node) => adapter.name(node) === "td" || adapter.name(node) === "th").map((td) => cellModel(adapter, td));
@@ -521,6 +545,7 @@ function colModel(adapter, node) {
   const col = { id: cleanText(adapter.attr(node, "data-id") ?? ""), pos: cleanText(adapter.attr(node, "data-pos") ?? "") };
   const fmt = adapter.attr(node, "fmt");
   if (fmt !== null) col.fmt = cleanText(fmt);
+  if (has(adapter, node, "hidden")) col.hidden = true;
   const width = /width:\s*([0-9]{1,7})px/.exec(adapter.attr(node, "style") ?? "");
   if (width) col.width = Number(width[1]);
   return col;
@@ -861,6 +886,7 @@ export {
   fnv1a,
   gridDigest,
   gridModel,
+  groupStarts,
   hex,
   holeHtml,
   holeMarker,

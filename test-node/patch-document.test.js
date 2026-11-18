@@ -145,3 +145,13 @@ test('the fallback route also refuses a hand-edited table', () => {
   const out = patch(src, [{ sheet: 'Styled', range: 'A2', values: [['x']] }])
   assert.deepEqual(range(out.html, 'Styled', 'A2'), [['x']])
 })
+
+test('a write into a hidden row keeps every hidden row and column hidden', () => {
+  const src = doc(sec('s1', 'Hidden', table('hidden')))
+  const out = patch(src, [{ sheet: 'Hidden', range: 'A2', values: [['written']] }])
+  assert.deepEqual(range(out.html, 'Hidden', 'A2'), [['written']])
+  assert.match(out.html, /<tr data-id="h-r2" data-pos="G" hidden style="height:30px"><td>written<\/td>/)
+  assert.match(out.html, /<tr data-id="h-r1" data-pos="8" hidden>/)
+  assert.match(out.html, /<tr data-id="h-r4" data-pos="l" hidden><\/tr>/)
+  assert.match(out.html, /<col data-id="h-c0" data-pos="G" hidden style="width:90px"><col data-id="h-c1" data-pos="V" fmt="0%" hidden>/)
+})
