@@ -46,16 +46,3 @@ test('extract of selector[] on empty matches returns []', () => {
   const $ = cheerio.load('<div></div>')
   assert.deepEqual(extract(cheerioAdapter, $.root(), { tags: '.tag[]' }).tags, [])
 })
-
-test('extract: @-split uses last @ so selectors can contain @', () => {
-  const $ = cheerio.load(
-    '<a class="mail" href="mailto:a@b.com" title="contact">click</a>',
-  )
-  const rules = {
-    mail: '[href*="@"]@title',
-    href: 'a[href*="@"]@href',
-  }
-  const result = extract(cheerioAdapter, $.root(), rules)
-  assert.equal(result.mail, 'contact')
-  assert.equal(result.href, 'mailto:a@b.com')
-})

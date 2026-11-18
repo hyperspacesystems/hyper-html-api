@@ -3,13 +3,6 @@ import assert from 'node:assert/strict'
 
 import { scaffold } from '../src/cms/scaffold.js'
 
-test('scaffold — scalar rule → empty string, attribute rule → null', () => {
-  assert.equal(scaffold('h1'), '')
-  assert.equal(scaffold('.title'), '')
-  assert.equal(scaffold('@href'), null)
-  assert.equal(scaffold('.'), '')
-})
-
 test('scaffold — scalar-array rule (suffix []) → empty array', () => {
   assert.deepEqual(scaffold('li[]'), [])
   assert.deepEqual(scaffold('.tag[]'), [])

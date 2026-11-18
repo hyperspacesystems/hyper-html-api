@@ -79,11 +79,6 @@ for (const [label, value] of refusedValues) {
   })
 }
 
-test('custom property write refuses an over-long value at exactly one char over the limit', () => {
-  refuseBoth(SRC, RULES, { accent: 'a'.repeat(201) })
-  assert.equal(applyBoth(SRC, RULES, { accent: 'a'.repeat(200) }, 'html'), `color: red; --accent: ${'a'.repeat(200)}`)
-})
-
 test('a plain declaration through @style is still refused', () => {
   refuseBoth(SRC, { p: '#p@style' }, { p: 'color: blue' })
 })

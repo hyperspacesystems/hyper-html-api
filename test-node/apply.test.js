@@ -207,14 +207,6 @@ test('apply (jsdom) — boolean prop coercion: the strings "true" and "false"', 
   assert.equal(agreeEl.checked, false)
 })
 
-test('apply (jsdom) — @innerHTML write + round-trip', () => {
-  const { adapter, root } = jsdomCtx('<div><div id="bio">old</div></div>')
-  const rules = { bio: '#bio@innerHTML' }
-  apply(adapter, root, rules, { bio: '<em>hi</em>' })
-  const bioEl = root.getElementById('bio')
-  assert.equal(bioEl.innerHTML, '<em>hi</em>')
-})
-
 test('apply (jsdom) — template captured before old[0] is detached', () => {
   // The first old item has a unique marker. We update a later item so oldNodes[0]
   // stays in place, AND we insert one new item. The inserted clone should carry

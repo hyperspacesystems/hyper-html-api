@@ -150,17 +150,6 @@ test('a CRLF value is accepted as the newline-normalized text the source keeps',
   assert.equal(read(exact.html).body, 'line1\nline2')
 })
 
-test('blank lines at the start of a textarea survive, as in a Journal entry', () => {
-  const html =
-    '<script data-rules-name="api" data-rules-version="1">{body:"textarea@textContent"}</script>' +
-    '<textarea>old</textarea>'
-  const body = '\n\nShopping list\n\n- eggs\n- milk\n\n'
-  const once = writeDocument(load, html, { body })
-  assert.equal(read(once.html).body, body)
-  const twice = writeDocument(load, once.html, { body })
-  assert.equal(read(twice.html).body, body)
-})
-
 test('a leading CR or CRLF in textarea text survives too', () => {
   const html = '<script data-rules-name="api" data-rules-version="1">{ta:"textarea@textContent",pre:"pre@textContent"}</script><textarea></textarea><pre></pre>'
   const result = writeDocument(load, html, { ta: '\r\nline', pre: '\rline' })

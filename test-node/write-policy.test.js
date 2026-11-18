@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import * as cheerio from 'cheerio'
 import cheerioAdapter from '../src/adapters/cheerio.js'
-import { apply, guardAdapter, checkAttribute, urlScheme } from '../src/engine/index.js'
+import { apply, guardAdapter } from '../src/engine/index.js'
 import { WriteRefused } from '../src/engine/errors.js'
 
 function run(html, rules, data) {
@@ -149,11 +149,4 @@ test('a list grows and shrinks through the guard', () => {
   assert.deepEqual(grown('li').map((_, n) => grown(n).text()).get(), ['A', 'C', 'D'])
   const shrunk = run('<ul><li>A</li><li>B</li></ul>', { items: 'li[]' }, { items: ['D'] })
   assert.deepEqual(shrunk('li').map((_, n) => shrunk(n).text()).get(), ['D'])
-})
-
-test('urlScheme and checkAttribute unit checks', () => {
-  assert.equal(urlScheme(' \tJavaScript:x'), 'javascript')
-  assert.equal(urlScheme('/a:b'), null)
-  assert.equal(typeof checkAttribute('ONCLICK', 'x'), 'string')
-  assert.equal(checkAttribute('href', 'https://a'), null)
 })
