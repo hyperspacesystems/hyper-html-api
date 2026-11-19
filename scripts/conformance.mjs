@@ -27,7 +27,7 @@ import adapter from "../src/adapters/cheerio.js";
 import { extract, parseRelaxed, findRulesIn } from "../src/engine/index.js";
 import { writeDocument, patchDocument, isPatchBody } from "../src/write.js";
 import { readDocument, parseSheetQuery, documentRules } from "../src/read.js";
-import { QueryRefused } from "../src/codecs/sheet.js";
+import { QueryRefused, sheet } from "../src/codecs/sheet.js";
 import { WRITE_POLICY } from "../src/engine/write-policy.js";
 import { isDeepStrictEqual } from "node:util";
 
@@ -96,7 +96,8 @@ function referenceStatus(err, face) {
 // ---------- write face ----------
 // A write case pins what POST /_/api/<file> does: the bytes on disk afterwards
 // (.after.html, compared byte for byte), the fresh extraction (.after.json),
-// whether anything changed and whether the splice held (.write.json), or the
+// whether anything changed, whether the splice held and whether a rule reads a
+// computed value this write did not recalculate (.write.json), or the
 // error (.error.json, with the structured details a host puts in its body).
 const WRITE_400 = ["NoRulesTag", "WriteRejected", "WriteRefused", "ShapeMismatch", "EmptyListInsert", "UnknownRulesVersion", "RulesParseError", "UnknownCodec", "CodecRefused"];
 
@@ -196,10 +197,10 @@ function runWriteCase(dir, name, meta, html) {
     return out;
   }
   out.files[`${name}.after.html`] = result.html;
-  out.files[`${name}.write.json`] = stable({ changed: result.changed, spliced: result.spliced });
+  out.files[`${name}.write.json`] = stable({ changed: result.changed, spliced: result.spliced, stale: result.stale });
   const $ = cheerio.load(result.html);
-  const after = meta.face === "write-query" ? rules : findRulesIn(adapter, $.root(), meta.token).rules;
-  out.files[`${name}.after.json`] = stable(extract(adapter, $.root(), after));
+  const found = meta.face === "write-query" ? { rules, version: "1" } : findRulesIn(adapter, $.root(), meta.token);
+  out.files[`${name}.after.json`] = stable(extract(adapter, $.root(), found.rules, { version: found.version, codecs: { sheet } }));
   return out;
 }
 

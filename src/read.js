@@ -161,3 +161,5 @@ function regionBytes(table, src, marker, regions) {
   const region = regions[Number(hole.slice(marker.length + 1))]
   return region ? src.slice(region.start, region.end) : null
 }
+
+export { hasComputedRules } from './computed.js'

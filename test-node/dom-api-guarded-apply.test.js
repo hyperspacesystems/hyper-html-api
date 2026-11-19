@@ -226,3 +226,34 @@ test('a rooted applyData call validates shadow root content on a fragment clone'
   assert.equal(root.querySelector('h1'), title)
   assert.equal(title.textContent, 'After')
 })
+
+test('applyData ignores a posted-back __meta__ unless the rules define it', () => {
+  const meta = { stale: true, why: 'No page has recalculated since this write. Open the document to refresh its computed values.' }
+  const document = new JSDOM('<h1>A</h1><p id="m">old</p>').window.document
+  applyData(document, { title: 'B', __meta__: meta }, { title: 'h1' })
+  assert.equal(document.querySelector('h1').textContent, 'B')
+  assert.doesNotMatch(document.documentElement.outerHTML, /recalculated/)
+  applyData(document, { __meta__: 'new' }, { title: 'h1', __meta__: '#m' })
+  assert.equal(document.getElementById('m').textContent, 'new')
+})
+
+test('hasComputedRules answers the same through the DOM adapter as through cheerio', async () => {
+  const { hasComputedRules } = await import('../src/computed.js')
+  const { default: dom } = await import('../src/adapters/dom.js')
+  const { default: cheerioAdapter } = await import('../src/adapters/cheerio.js')
+  const pages = [
+    ['<main sap state="q=1"><input bind="q"><b id="t" text="q*2">2</b></main>', { t: '#t@textContent' }, true],
+    ['<main sap><a id="l" attr:href="u">x</a></main>', { l: '#l@href' }, true],
+    ['<main sap><p id="p" class:on="x">1</p></main>', { p: '#p@class' }, true],
+    ['<main sap><template><b text="x">1</b></template><b id="n">2</b></main>', { n: '#n' }, false],
+    ['<form><output id="o">2</output></form>', { o: '#o' }, true],
+    ['<h1>Notes</h1>', { title: 'h1' }, false],
+    ['<main sap css:pct="1"><h1>T</h1></main>', { accent: 'main@--accent', pct: 'main@--pct' }, true],
+    ['<main sap css:pct="1"><h1>T</h1></main>', { accent: 'main@--accent' }, false],
+    ['<article><p>a</p><p><output>3</output></p></article>', { lede: 'article p' }, false],
+  ]
+  for (const [html, rules, want] of pages) {
+    assert.equal(hasComputedRules(dom, new JSDOM(html).window.document, rules), want, html)
+    assert.equal(hasComputedRules(cheerioAdapter, cheerio.load(html).root(), rules), want, html)
+  }
+})

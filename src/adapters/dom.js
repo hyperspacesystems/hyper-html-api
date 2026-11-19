@@ -82,6 +82,10 @@ const dom = {
     syncTextareaValue(node, value)
   },
 
+  attrNames(node) {
+    return node && node.getAttributeNames ? node.getAttributeNames() : []
+  },
+
   attr(node, name, value) {
     if (value === undefined) {
       return node.hasAttribute && node.hasAttribute(name) ? node.getAttribute(name) : null
@@ -254,6 +258,9 @@ export function createDomAdapter(operationRoot, opts = {}) {
       const copy = contentView().cloneOf(target)
       if (copy) replaceProjectedContent(target, copy, 'textContent', value)
       else dom.text(target, value)
+    },
+    attrNames(node) {
+      return dom.attrNames(live(node))
     },
     attr(node, name, value) {
       const target = live(node)

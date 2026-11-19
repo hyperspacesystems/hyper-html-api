@@ -51,3 +51,13 @@ export function planWrite(adapter, root, rules, data, opts = {}) {
   checkTargets(root, rules, data, [])
   return { unknownKeys, unmatched }
 }
+
+// A host answers a write with a top level `__meta__` key (stale, why), and an agent
+// may post that object back whole. Unless the rules define `__meta__` as data, the
+// key is dropped before anything plans, applies or checks the write.
+export function withoutMeta(rules, data) {
+  const has = (obj) => Object.prototype.hasOwnProperty.call(Object(obj), '__meta__')
+  if (!has(data) || has(rules)) return data
+  const { __meta__, ...rest } = data
+  return rest
+}

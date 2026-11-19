@@ -130,6 +130,11 @@ const cheerioAdapter = {
     replaceProjected(node, escapeText(value))
   },
 
+  attrNames(node) {
+    const attribs = node && node[0] && node[0].attribs
+    return attribs ? Object.keys(attribs) : []
+  },
+
   attr(node, name, value) {
     if (value === undefined) {
       // Read the raw attribs map rather than .attr(): cheerio's getter returns

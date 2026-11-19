@@ -125,6 +125,7 @@ function assertNoReadOnlyTargets(rule, value) {
 }
 
 function guardedApply(root, rules, data, version) {
+  data = engineMod.withoutMeta(rules, data)
   const opts = withCodecs({ templateAttr: 'cms-template', version })
   const liveTree = containingTree(root)
   const rootPath = childIndexPath(liveTree, root)

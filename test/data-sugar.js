@@ -1,4 +1,5 @@
 import { extractData, applyData, engine } from '/src/data.js'
+import domAdapter, { createDomAdapter } from '/src/adapters/dom.js'
 
 // Browser coverage for the data sugar (extractData / applyData). Mirrors the
 // bind.js style: build DOM with mount() and assert with chai. Omitted rules use
@@ -109,5 +110,23 @@ describe('engine is still exposed from the lean entry', () => {
     const viaEngine = engine.bind(host, 'api').get()
     const viaSugar = extractData(host, 'api')
     viaEngine.should.deep.equal(viaSugar)
+  })
+})
+
+describe('a host answer posted back', () => {
+  it('applyData drops a top level __meta__ unless the rules define it', () => {
+    const host = mount('<h1></h1><p id="m">old</p>')
+    applyData(host, { heading: 'B', __meta__: { stale: true } }, { heading: 'h1' })
+    host.querySelector('h1').textContent.should.equal('B')
+    applyData(host, { __meta__: 'new' }, { heading: 'h1', __meta__: '#m' })
+    host.querySelector('#m').textContent.should.equal('new')
+  })
+
+  it('attrNames lists an element\'s attributes through both DOM adapters', () => {
+    const host = mount('<b id="t" text="q*2" class:on="x">2</b>')
+    const el = host.querySelector('#t')
+    domAdapter.attrNames(el).should.deep.equal(['id', 'text', 'class:on'])
+    createDomAdapter(host).attrNames(el).should.deep.equal(['id', 'text', 'class:on'])
+    domAdapter.attrNames(document).should.deep.equal([])
   })
 })

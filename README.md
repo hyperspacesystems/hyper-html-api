@@ -144,7 +144,7 @@ conformance cases.
 import { writeDocument } from 'hyper-html-api/write'
 import * as cheerio from 'cheerio'
 
-const { html, changed, spliced } = writeDocument(cheerio.load, src, { title: 'Groceries' })
+const { html, changed, spliced, stale } = writeDocument(cheerio.load, src, { title: 'Groceries' })
 ```
 
 Supply `rules` to write a document without adding a mapping tag:
@@ -168,11 +168,18 @@ An invalid explicit value throws `RulesParseError`; it never falls back to the t
 - **Strict keys.** An unknown key or a rule whose selector matches nothing throws
   `WriteRejected` before anything is applied. Without `options.rules`, the document must
   have a rules tag for the token (default `api`), or `NoRulesTag` is thrown.
+  A top level `__meta__` key is the exception: a host's answer about a write, which an agent
+  may post back whole, so it is dropped unless the rules define `__meta__` themselves.
 - **Byte-preserving.** Only the elements that changed are re-serialized and spliced into
   the original source. The result is verified by reparsing, and when that proof fails the
   whole document is rendered instead (`spliced: false`). A body that changes nothing
   returns the source untouched with `changed: false`.
 - `no-data` and `editor-ui` regions are invisible to writes, as they are to reads.
+- **Honest about computed values.** `stale` is `true` when any rule reads a value the page
+  computes: text or an attribute sapjs paints, an `<output>`, anything inside a
+  `clay="no-dirty"`, `no-dirty` or `save-ignore` region, or a sheet with a formula or a
+  `stale` mark. A write runs no script, so those values may be old until a page opens.
+  `hasComputedRules(adapter, root, rules)` answers the same question for any document.
 
 ### Patching sheets
 

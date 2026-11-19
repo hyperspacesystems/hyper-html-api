@@ -3,7 +3,8 @@ import { apply } from './engine/apply.js'
 import { extract } from './engine/extract.js'
 import { findRulesIn } from './engine/rules-tag.js'
 import { guardAdapter } from './engine/write-policy.js'
-import { planWrite } from './engine/write-plan.js'
+import { planWrite, withoutMeta } from './engine/write-plan.js'
+import { hasComputedRules } from './computed.js'
 import { assertRoundTrip } from './engine/round-trip.js'
 import { trackAdapter, spliceDocument } from './engine/splice.js'
 import { NoRulesTag, RulesParseError, WriteRejected } from './engine/errors.js'
@@ -13,7 +14,10 @@ import { codecOf } from './engine/rule-syntax.js'
 // Applies a JSON body to a document's source through caller-provided rules
 // (options.rules) or the document's own rules tag, under the content-only
 // policy. `load` is cheerio.load, passed in so this package keeps cheerio out
-// of its browser bundles. Returns the new source and whether anything changed.
+// of its browser bundles. Returns { html, changed, spliced, stale }: `stale` is
+// true when a rule reads a computed value (src/computed.js), which this write
+// did not recalculate. A top level `__meta__` key in the body is a host's answer
+// posted back, dropped unless the rules define it.
 // Throws NoRulesTag, RulesParseError, WriteRejected, WriteRefused, ShapeMismatch,
 // EmptyListInsert, UnknownCodec or WriteNotRoundTripped, always before producing
 // any output. options.codecs maps a name to a codec for `@codec(name)` rules,
@@ -38,6 +42,7 @@ export function writeDocument(load, src, data, options = {}) {
     rules = found.rules
     version = found.version
   }
+  data = withoutMeta(rules, data)
   const plan = planWrite(cheerioAdapter, root, rules, data, { version, codecs })
   if (plan.unknownKeys.length || plan.unmatched.length) throw new WriteRejected(plan.unknownKeys, plan.unmatched)
   const opts = { templateAttr: 'cms-template', version, codecs }
@@ -56,7 +61,7 @@ export function writeDocument(load, src, data, options = {}) {
   const written = writtenRules(rules, data)
   const writtenRoot = load(html).root()
   assertRoundTrip(written, data, extract(cheerioAdapter, writtenRoot, written, { ...opts, allMatches: true }), codecs)
-  return { html, changed: html !== src, spliced }
+  return { html, changed: html !== src, spliced, stale: hasComputedRules(cheerioAdapter, writtenRoot, rules, opts) }
 }
 
 // The top-level subset of `rules` that the payload names, which is exactly what
@@ -76,6 +81,7 @@ function isPlainObject(value) {
 }
 
 export { patchDocument, NOT_CANONICAL_MESSAGE } from './patch-document.js'
+export { hasComputedRules } from './computed.js'
 
 // The one rule every host uses to tell a patch body from a data write: an
 // object whose `patch` value is an array and whose only other key is
