@@ -5,6 +5,7 @@ import { findRulesIn } from './engine/rules-tag.js'
 import { codecOf } from './engine/rule-syntax.js'
 import { pickTab, sheet, tabNodes } from './codecs/sheet.js'
 import { CodecMiss, QueryRefused, holeMarker, patchGrid, scanGrid } from './codecs/sheet.vendor.js'
+import { frameFrom, standard } from './codecs/formula.vendor.js'
 import { holesHold } from './read.js'
 
 export const NOT_CANONICAL_MESSAGE =
@@ -20,7 +21,9 @@ export const NOT_CANONICAL_MESSAGE =
 // where `sheet` matches tab name first, then id. Omitting `sheet` selects the
 // first tab for `range` and `append`; deletion requires `sheet` and `delete`
 // set to exactly `true`. Values are typed input: null clears, a number or
-// boolean is that value, a string starting with "=" is a formula, any other
+// boolean is that value, a string starting with "=" is a formula, stored in the
+// standard spelling of sapjs's `standard`, which the sheet editor is to store too (`=sum(a1:a3)` is `=SUM(A1:A3)`, `=budget!a1`
+// is `=Budget!A1`; text that does not parse is kept as typed), and any other
 // string is text.
 //
 // options.token selects the version 2 rules tag (default 'api'). options.newId()
@@ -85,6 +88,7 @@ export function patchDocument(load, src, patch, options = {}) {
   let cells = 0
   let rows = 0
   let stale = false
+  const spell = speller(tabs.filter((tab) => !deleted.has(tab)), src)
   for (const [tab, ops] of groups) {
     if (deleted.has(tab)) {
       const location = tab.section.get(0)?.sourceCodeLocation
@@ -93,7 +97,8 @@ export function patchDocument(load, src, patch, options = {}) {
       continue
     }
     if (!tab.region) throw new CodecRefused('sheet-not-canonical', NOT_CANONICAL_MESSAGE)
-    const result = patchGrid(src.slice(tab.region.start, tab.region.end), ops, newId ? { newId } : {})
+    const written = ops.map((op) => spellOp(op, (f) => spell(f, tab.id)))
+    const result = patchGrid(src.slice(tab.region.start, tab.region.end), written, newId ? { newId } : {})
     edits.push({ ...tab.region, bytes: result.bytes })
     cells += result.changed.cells
     rows += result.changed.rows
@@ -111,6 +116,48 @@ export function patchDocument(load, src, patch, options = {}) {
   let html = src
   for (const edit of edits) html = html.slice(0, edit.start) + edit.bytes + html.slice(edit.end)
   return { html, changed: { cells, rows, ...(deleted.size ? { sheets: deleted.size } : {}) }, stale }
+}
+
+// Writes a formula in the standard spelling, read in a frame of every tab's name
+// and row and column count (built on the first formula; the printer needs only the
+// order's size, so the ids are placeholders).
+function speller(tabs, src) {
+  let frame = null
+  return (f, homeId) => {
+    frame ??= frameFrom(tabs.map((tab) => {
+      const [rows, cols] = tabSize(tab, src)
+      return { id: tab.id, name: tab.name, rows: Array.from({ length: rows }, (_, i) => String(i)), cols: Array.from({ length: cols }, (_, i) => String(i)) }
+    }))
+    try {
+      return standard(f, homeId, frame)
+    } catch (error) {
+      if (error instanceof RangeError) throw new QueryRefused('bad_value', 'a formula nests too deeply to read')
+      throw error
+    }
+  }
+}
+
+function tabSize(tab, src) {
+  if (tab.region) {
+    let rows = 0
+    let cols = 0
+    scanGrid(src, tab.region.start, { row: () => rows++, col: () => cols++ })
+    return [rows, cols]
+  }
+  if (tab.table) return [tab.table.find('tr').length, tab.table.find('col').length]
+  return [0, 0]
+}
+
+const spellValues = (values, spell) =>
+  Array.isArray(values)
+    ? values.map((row) => (Array.isArray(row) ? row.map((v) => (typeof v === 'string' && v.startsWith('=') ? spell(v) : v)) : row))
+    : values
+
+function spellOp(op, spell) {
+  const out = { ...op }
+  if (Object.hasOwn(op, 'values')) out.values = spellValues(op.values, spell)
+  if (Object.hasOwn(op, 'append')) out.append = spellValues(op.append, spell)
+  return out
 }
 
 function groupOps(tabs, patch) {

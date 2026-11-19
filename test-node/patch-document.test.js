@@ -188,3 +188,23 @@ test('a write beside a tab already marked stale answers stale true', () => {
   assert.equal(out.stale, true)
   assert.equal(out.html.includes(marked), true)
 })
+
+test('an agent formula is stored in the standard spelling a tab stores', () => {
+  const out = patch(SRC, [
+    { sheet: 'Budget', range: 'B4', values: [['=sum(b2:b3)+styled!b1']] },
+    { sheet: 'Budget', append: [['=if(true,a1,"a1")', '=sum(']] },
+  ])
+  assert.match(out.html, /<td f="=SUM\(B2:B3\)\+Styled!B1"><\/td>/)
+  assert.match(out.html, /<td f="=IF\(TRUE,A1,&quot;a1&quot;\)"><\/td><td f="=sum\("><\/td>/)
+})
+
+test('a formula nested too deeply to read is refused as a bad value', () => {
+  const deep = '=' + '('.repeat(5000) + '1' + ')'.repeat(5000)
+  assert.throws(() => patch(SRC, [{ sheet: 'Budget', range: 'B4', values: [[deep]] }]), (e) => e instanceof QueryRefused && e.code === 'bad_value')
+})
+
+test('spelling leaves string literals alone and quotes a tab named like a cell', () => {
+  const src = doc(sec('s1', 'Budget', table('tiny')) + sec('s2', 'AB12', table('styled')))
+  const out = patch(src, [{ sheet: 'Budget', range: 'B4', values: [['=ab12!a1&"=sum(a1) true budget!b1"']] }])
+  assert.match(out.html, /<td f="='AB12'!A1&amp;&quot;=sum\(a1\) true budget!b1&quot;"><\/td>/)
+})
