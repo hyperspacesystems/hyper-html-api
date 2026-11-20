@@ -13,7 +13,8 @@ export function schemaFor(rule, omit = []) {
   }
   if (Array.isArray(rule)) return { type: 'array', items: schemaFor(rule[1]) }
   if (rule && typeof rule === 'object') {
-    const keys = Object.keys(rule).filter((key) => !omit.includes(key))
+    const drop = Array.isArray(omit) ? omit : []
+    const keys = Object.keys(rule).filter((key) => !drop.includes(key))
     return {
       type: 'object',
       additionalProperties: false,
