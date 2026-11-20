@@ -3,12 +3,12 @@ import { applyData, extractData, blankData } from '/src/data.js'
 describe('blankData', () => {
   it('fills every key, skips codecs, merges starting values into objects and list rows, and refuses non-objects', () => {
     blankData({ title: 'h1', tags: '.t[]', lines: ['li', '.'], rows: ['li', { n: '.n', b: '.b' }], grid: '#g@codec(sheet)', meta: { a: 'p', c: 'q' } })
-      .should.deep.equal({ title: '', tags: [], lines: [], rows: [], meta: { a: '', c: '' } })
+      .should.deep.equal({ title: null, tags: [], lines: [], rows: [], meta: { a: null, c: null } })
 
     blankData(
       { title: 'h1', lines: ['li', '.'], rows: ['li', { n: '.n', b: '.b' }], badRows: ['li', { n: '.n' }], meta: { a: 'p', c: 'q' }, rawMeta: { a: 'p' } },
       { lines: ['one'], rows: [{ n: 'x', extra: 1 }, null], badRows: 'bad', meta: { a: 'x' }, rawMeta: null, other: 1 },
-    ).should.deep.equal({ title: '', lines: ['one'], rows: [{ n: 'x', b: '' }, null], badRows: 'bad', meta: { a: 'x', c: '' }, rawMeta: null })
+    ).should.deep.equal({ title: null, lines: ['one'], rows: [{ n: 'x', b: null }, null], badRows: 'bad', meta: { a: 'x', c: null }, rawMeta: null })
 
     chai.expect(() => blankData(null)).to.throw(TypeError)
     chai.expect(() => blankData([])).to.throw(TypeError)

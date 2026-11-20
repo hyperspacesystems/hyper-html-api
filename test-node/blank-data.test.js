@@ -7,7 +7,7 @@ import { applyData, extractData, blankData } from '../src/data.js'
 test('every key is filled, and a codec rule is left alone', () => {
   assert.deepEqual(
     blankData({ title: 'h1', tags: '.tag[]', rows: ['li', { name: '.n' }], meta: { note: 'p' }, grid: '#g@codec(sheet)' }),
-    { title: '', tags: [], rows: [], meta: { note: '' } },
+    { title: null, tags: [], rows: [], meta: { note: null } },
   )
 })
 
@@ -17,7 +17,7 @@ test('starting values win key by key and merge into objects and list rows; unkno
       { meta: { title: 'h1', note: 'p' }, rows: ['li', { name: '.n', body: '.b' }] },
       { meta: { title: 'Journal' }, rows: [{ name: 'a', extra: 1 }], extra: 1 },
     ),
-    { meta: { title: 'Journal', note: '' }, rows: [{ name: 'a', body: '' }] },
+    { meta: { title: 'Journal', note: null }, rows: [{ name: 'a', body: null }] },
   )
 })
 
@@ -51,4 +51,13 @@ test('a starting row after blanking is made from the seed, blanking omitted rule
   })
   assert.equal(doc.querySelector('main ul.rows > li .d').textContent, 'seed note')
   assert.equal(doc.querySelectorAll('main section.list:not([cms-template]) li.card[cms-template]').length, 1)
+})
+
+test('a blank attribute rule removes the attribute instead of writing it empty', () => {
+  const doc = new JSDOM('<main><div class="card" data-done hidden-note="x">Ship</div></main>').window.document
+  const rules = { done: '.card@data-done', name: '.card' }
+  applyData(doc, blankData(rules), rules)
+  const card = doc.querySelector('.card')
+  assert.equal(card.hasAttribute('data-done'), false)
+  assert.equal(card.textContent, '')
 })

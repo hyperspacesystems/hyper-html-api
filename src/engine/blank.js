@@ -5,7 +5,9 @@ const isPlain = (value) => value !== null && typeof value === 'object' && !Array
 function blankFor(rule) {
   if (typeof rule === 'string') {
     if (codecOf(rule)) return undefined
-    return rule.endsWith('[]') ? [] : ''
+    // null, not '': it empties text and removes an attribute, so `data-done=""` never switches a
+    // presence attribute on in the blank copy.
+    return rule.endsWith('[]') ? [] : null
   }
   if (Array.isArray(rule)) return []
   const out = {}
