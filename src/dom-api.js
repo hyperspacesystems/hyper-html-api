@@ -33,6 +33,7 @@ export const engine = {
   // four copies of the split drifted apart.
   ruleAttrIndex: engineMod.ruleAttrIndex,
   splitRule: engineMod.splitRule,
+  codecOf: engineMod.codecOf,
   errors: engineMod.errors,
   DOM_PROPERTIES: engineMod.DOM_PROPERTIES,
 }

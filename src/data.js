@@ -4,8 +4,9 @@
 // extract/apply is a core primitive, not a cms one).
 import { engine, extractData, applyData } from './dom-api.js'
 import { schemaFor } from './engine/schema.js'
+import { blankData } from './engine/blank.js'
 
-export { engine, extractData, applyData, schemaFor }
+export { engine, extractData, applyData, schemaFor, blankData }
 
-const HyperHtmlApiData = { engine, extractData, applyData, schemaFor }
+const HyperHtmlApiData = { engine, extractData, applyData, schemaFor, blankData }
 export default HyperHtmlApiData
