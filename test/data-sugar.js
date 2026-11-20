@@ -1,4 +1,4 @@
-import { extractData, applyData, engine } from '/src/data.js'
+import { extractData, applyData, engine, schemaFor } from '/src/data.js'
 import domAdapter, { createDomAdapter } from '/src/adapters/dom.js'
 
 // Browser coverage for the data sugar (extractData / applyData). Mirrors the
@@ -128,5 +128,29 @@ describe('a host answer posted back', () => {
     domAdapter.attrNames(el).should.deep.equal(['id', 'text', 'class:on'])
     createDomAdapter(host).attrNames(el).should.deep.equal(['id', 'text', 'class:on'])
     domAdapter.attrNames(document).should.deep.equal([])
+  })
+})
+
+describe('schemaFor', () => {
+  it('builds schemas for scalars, string lists, codecs, lists and omitted top keys', () => {
+    const shape = schemaFor(
+      { title: '.t', tags: '.tag[]', grid: '#g@codec(sheet)', files: ['.f', { title: '.ft' }] },
+      ['grid'],
+    )
+    shape.should.deep.equal({
+      type: 'object',
+      additionalProperties: false,
+      required: ['title', 'tags', 'files'],
+      properties: {
+        title: { type: 'string' },
+        tags: { type: 'array', items: { type: 'string' } },
+        files: {
+          type: 'array',
+          items: { type: 'object', additionalProperties: false, required: ['title'], properties: { title: { type: 'string' } } },
+        },
+      },
+    })
+    schemaFor('#g@codec(sheet)').should.deep.equal({})
+    chai.expect(() => schemaFor(null)).to.throw(TypeError)
   })
 })
