@@ -134,6 +134,26 @@
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-20
+
+### Added
+- `schemaFor` returns the JSON Schema of the value a rule reads, so you can ask an agent for exactly what the page writes back.
+- `blankData` returns a rules object's blank data, with starting values merged into objects and list rows.
+- `engine.codecOf` is exported.
+
+### Changed
+- `patchDocument` marks a sheet table stale only when a browser must recalculate or redraw.
+- On any write, `patchDocument` marks every untouched tab that holds a formula, as a deletion does, and returns `stale: true` when any table it wrote or kept holds the mark. A workbook with no formulas stays unmarked.
+- `writeDocument` returns `stale` when a rule reads a computed value.
+- Writing a computed value marks the document stale.
+- A `__meta__` sent back to `writeDocument` is ignored.
+
+### Fixed
+- Applying a patch keeps hidden rows and columns hidden, including a bare `hidden` attribute on `<tr>` and `<col>`, and `<tbody>` groups that never end inside a vertical merge.
+- Formulas written by agents through `patchDocument` are stored in the standard spelling.
+- `schemaFor` drops nothing when `omit` is not a list.
+- In `blankData`, a blank scalar is `null`, so an attribute rule removes its attribute instead of writing it empty.
+
 ## [0.16.0] - 2026-11-14
 
 ### Added
