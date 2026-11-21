@@ -4,19 +4,19 @@
 // src/grid/codec/value.js
 var NUMBER = /^-?(0|[1-9][0-9]*)(\.[0-9]+)?$/;
 var MAX_DIGITS = 15;
-function significantDigits(text) {
-  return text.replace(/^-/, "").replace(".", "").replace(/^0+/, "").replace(/0+$/, "").length;
+function significantDigits(text2) {
+  return text2.replace(/^-/, "").replace(".", "").replace(/^0+/, "").replace(/0+$/, "").length;
 }
-function typed(text, forceText = false) {
-  if (text === "") return null;
-  if (forceText) return text;
-  if (text === "TRUE") return true;
-  if (text === "FALSE") return false;
-  if (!NUMBER.test(text)) return text;
-  const digits = significantDigits(text);
-  if (digits > MAX_DIGITS) return text;
-  const number = Number(text);
-  if (!Number.isFinite(number) || number === 0 && digits > 0) return text;
+function typed(text2, forceText = false) {
+  if (text2 === "") return null;
+  if (forceText) return text2;
+  if (text2 === "TRUE") return true;
+  if (text2 === "FALSE") return false;
+  if (!NUMBER.test(text2)) return text2;
+  const digits = significantDigits(text2);
+  if (digits > MAX_DIGITS) return text2;
+  const number = Number(text2);
+  if (!Number.isFinite(number) || number === 0 && digits > 0) return text2;
   return number === 0 ? 0 : number;
 }
 function shown(value) {
@@ -42,14 +42,113 @@ function cellValue(cell) {
   return typed(cell.v ?? cell.text, cell.t === true);
 }
 
+// src/grid/codec/rules.js
+var RULE_KINDS = ["check", "list", "when", "scale", "chart"];
+var RULE_FIELDS = ["items", "source", "open", "test", "a", "b", "f", "style", "low", "mid", "high", "type", "title", "stacked", "series"];
+var RULE_FLAGS = /* @__PURE__ */ new Set(["open", "stacked"]);
+var CHART_TYPES = ["column", "bar", "line", "area", "pie", "scatter"];
+var STACKING = /* @__PURE__ */ new Set(["column", "bar", "area"]);
+var RULE_TESTS = {
+  gt: ["a"],
+  ge: ["a"],
+  lt: ["a"],
+  le: ["a"],
+  eq: ["a"],
+  ne: ["a"],
+  contains: ["a"],
+  starts: ["a"],
+  ends: ["a"],
+  between: ["a", "b"],
+  outside: ["a", "b"],
+  empty: [],
+  filled: [],
+  duplicate: [],
+  unique: [],
+  formula: ["f"]
+};
+var MAX_ITEMS = 500;
+var MAX_ITEM_LENGTH = 255;
+var MAX_TITLE_LENGTH = 255;
+var COLOR = /^#[0-9a-f]{6}$/;
+var UNSAFE = /[\r\0]|[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+var text = (value) => typeof value === "string" && value !== "";
+function itemsProblem(items) {
+  if (!Array.isArray(items) || items.length === 0 || items.length > MAX_ITEMS) return `a list rule has 1 to ${MAX_ITEMS} items`;
+  for (const item of items) {
+    if (typeof item !== "string" || item === "" || item.length > MAX_ITEM_LENGTH) return `a list item is 1 to ${MAX_ITEM_LENGTH} characters`;
+    if (UNSAFE.test(item)) return "a list item holds a carriage return, a NUL or half a character";
+  }
+  return null;
+}
+var BOX = /^([A-Z]{1,3})([1-9][0-9]{0,6})(?::([A-Z]{1,3})([1-9][0-9]{0,6}))?$/;
+var letters = (name) => [...name].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+var MAX_BOX_COL = 16383;
+function chartBox(range) {
+  const m = typeof range === "string" ? BOX.exec(range) : null;
+  if (m === null) return null;
+  const box = { left: letters(m[1]), top: Number(m[2]) - 1, right: letters(m[3] ?? m[1]), bottom: Number(m[4] ?? m[2]) - 1 };
+  return box.right <= MAX_BOX_COL && box.left <= box.right && box.top <= box.bottom ? box : null;
+}
+function ruleProblem(rule) {
+  if (rule === null || typeof rule !== "object" || Array.isArray(rule)) return "a rule is a record";
+  if (!RULE_KINDS.includes(rule.kind)) return `unknown rule kind ${JSON.stringify(rule.kind)}`;
+  for (const key of ["id", "pos", "range"]) if (!text(rule[key])) return `a rule has no ${key}`;
+  const allowed = /* @__PURE__ */ new Set(["id", "pos", "kind", "range"]);
+  const need = (...keys) => {
+    for (const key of keys) {
+      allowed.add(key);
+      if (!text(rule[key])) return `a ${rule.kind} rule has no ${key}`;
+    }
+    return null;
+  };
+  let problem = null;
+  if (rule.kind === "list") {
+    allowed.add("items").add("source").add("open");
+    if (rule.items === void 0 === (rule.source === void 0)) return "a list rule has items or a source, not both";
+    if (rule.items !== void 0) problem = itemsProblem(rule.items);
+    else if (!text(rule.source)) problem = "a list rule has no source";
+    if (rule.open !== void 0 && rule.open !== true) problem = "open is true or absent";
+  } else if (rule.kind === "when") {
+    const compared = RULE_TESTS[rule.test];
+    if (compared === void 0 || !Object.hasOwn(RULE_TESTS, rule.test)) return `unknown rule test ${JSON.stringify(rule.test)}`;
+    allowed.add("test");
+    problem = need("style", ...compared);
+  } else if (rule.kind === "chart") {
+    allowed.add("source").add("type").add("title").add("stacked").add("series");
+    if (chartBox(rule.range) === null) return "a chart's range is A1 or A1:B2, top-left cell first, within XFD and row 9999999, with no $";
+    if (!text(rule.source)) return "a chart rule has no source";
+    if (!CHART_TYPES.includes(rule.type)) return `unknown chart type ${JSON.stringify(rule.type)}`;
+    if (rule.title !== void 0 && (!text(rule.title) || rule.title.length > MAX_TITLE_LENGTH || UNSAFE.test(rule.title))) {
+      problem = `a chart title is 1 to ${MAX_TITLE_LENGTH} characters with no carriage return, NUL or half a character`;
+    }
+    if (rule.stacked !== void 0 && (rule.stacked !== true || !STACKING.has(rule.type))) problem = "stacked is true or absent, and only on a column, bar or area chart";
+    if (rule.series !== void 0 && rule.series !== "rows") problem = "series is rows or absent";
+  } else if (rule.kind === "scale") {
+    problem = need("low", "high");
+    if (rule.mid !== void 0) allowed.add("mid");
+    for (const key of ["low", "mid", "high"]) if (problem === null && rule[key] !== void 0 && !COLOR.test(rule[key])) problem = `${key} is a color written #rrggbb`;
+  }
+  if (problem !== null) return problem;
+  for (const key of Object.keys(rule)) if (!allowed.has(key)) return `${key} is not a field of a ${rule.kind} rule`;
+  for (const key of ["source", "test", "a", "b", "f", "style", "title"]) if (rule[key] !== void 0 && typeof rule[key] !== "string") return `${key} is text`;
+  return null;
+}
+function copyRule(rule) {
+  const copy = { id: rule.id, pos: rule.pos, kind: rule.kind, range: rule.range };
+  for (const field of RULE_FIELDS) if (rule[field] !== void 0) copy[field] = field === "items" ? [...rule[field]] : rule[field];
+  return copy;
+}
+var byRule = (a, b) => a.pos !== b.pos ? a.pos < b.pos ? -1 : 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+var sameRule = (a, b) => JSON.stringify(a ? copyRule(a) : null) === JSON.stringify(b ? copyRule(b) : null);
+
 // src/grid/codec/write.js
 var FORBIDDEN = /[\r\0]/;
 var MAX_COUNT = 9999999;
 var EMPTY_CELL = "<td></td>";
 function clean(value, what) {
-  const text = String(value);
-  if (FORBIDDEN.test(text)) throw new TypeError(`grid codec: ${what} holds a carriage return or NUL`);
-  return text;
+  const text2 = String(value);
+  if (FORBIDDEN.test(text2)) throw new TypeError(`grid codec: ${what} holds a carriage return or NUL`);
+  return text2;
 }
 var textEscape = (value) => clean(value, "cell text").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 var attrEscape = (value) => clean(value, "attribute value").replace(/&/g, "&amp;").replace(/"/g, "&quot;");
@@ -90,6 +189,19 @@ function colHtml(col) {
   if (col.width !== void 0) attrs += ` style="width:${count(col.width, 0, "width")}px"`;
   return `<col${attrs}>`;
 }
+function ruleHtml(rule) {
+  const problem = ruleProblem(rule);
+  if (problem !== null) throw new TypeError(`grid codec: ${problem}`);
+  let attrs = attr("data-id", rule.id) + attr("data-pos", rule.pos) + attr("kind", rule.kind) + attr("range", rule.range);
+  for (const field of RULE_FIELDS) {
+    if (rule[field] === void 0) continue;
+    attrs += RULE_FLAGS.has(field) ? ` ${field}` : attr(field, field === "items" ? JSON.stringify(rule.items) : rule[field]);
+  }
+  return `<rule${attrs}></rule>`;
+}
+var rulesHtml = (rules) => rules?.length ? `<template rules>
+${rules.map(ruleHtml).join("\n")}
+</template>` : "";
 function groupStarts(rows, groupSize = 50) {
   const starts = [0];
   let start = 0;
@@ -127,7 +239,7 @@ function tableHtml(sheet, { groupSize = 50 } = {}) {
   const { head, data, starts } = tableParts(sheet, { groupSize });
   let html = head;
   for (let g = 0; g < starts.length; g++) html += groupHtml(data.slice(starts[g], starts[g + 1] ?? data.length));
-  return `${html}</table>`;
+  return `${html}${rulesHtml(sheet.rules)}</table>`;
 }
 
 // src/grid/codec/scan.js
@@ -260,11 +372,11 @@ function readCell(src, i) {
   i = expect(src, i, ">");
   const lt = src.indexOf("<", i);
   if (lt === -1) miss("open cell", i);
-  const text = decode(src.slice(i, lt), TEXT_REFS, TEXT_DECODED, i);
+  const text2 = decode(src.slice(i, lt), TEXT_REFS, TEXT_DECODED, i);
   cursor = expect(src, lt, "</td>");
-  if (cell.hidden && text !== "") miss("a hidden cell with text", i);
-  if (bare && text === "") return null;
-  return Object.assign({ text }, cell);
+  if (cell.hidden && text2 !== "") miss("a hidden cell with text", i);
+  if (bare && text2 === "") return null;
+  return Object.assign({ text: text2 }, cell);
 }
 function readRow(src, i, frozen) {
   i = expect(src, i, '<tr data-id="');
@@ -307,6 +419,43 @@ function readGroup(src, i, frozen, sink, index) {
   sink.group?.(start, cursor, frozen);
   return index;
 }
+function readRule(src, i) {
+  const start = i;
+  i = expect(src, i, '<rule data-id="');
+  const rule = { id: readAval(src, i) };
+  rule.pos = readAval(src, expect(src, cursor, ' data-pos="'));
+  rule.kind = readAval(src, expect(src, cursor, ' kind="'));
+  rule.range = readAval(src, expect(src, cursor, ' range="'));
+  i = cursor;
+  for (const field of RULE_FIELDS) {
+    if (RULE_FLAGS.has(field)) {
+      if (flag(src, i, ` ${field}`)) {
+        rule[field] = true;
+        i += field.length + 1;
+      }
+      continue;
+    }
+    if (!src.startsWith(` ${field}="`, i)) continue;
+    const raw = readAval(src, i + field.length + 3);
+    i = cursor;
+    if (field !== "items") {
+      rule[field] = raw;
+      continue;
+    }
+    let items = null;
+    try {
+      items = JSON.parse(raw);
+    } catch {
+      miss("rule items that are not JSON", start);
+    }
+    if (!Array.isArray(items) || JSON.stringify(items) !== raw) miss("rule items that are not a list written as the writer writes it", start);
+    rule.items = items;
+  }
+  const problem = ruleProblem(rule);
+  if (problem !== null) miss(problem, start);
+  cursor = expect(src, i, "></rule>");
+  return rule;
+}
 function scanGrid(src, at, sink = NO_SINK) {
   let i = expect(src, at, "<table grid");
   const table = {};
@@ -340,6 +489,24 @@ function scanGrid(src, at, sink = NO_SINK) {
   while (src.startsWith("<tbody>", i)) {
     index = readGroup(src, i, false, sink, index);
     i = skipSpace(src, cursor);
+  }
+  if (src.startsWith("<template rules>", i)) {
+    const start = i;
+    i += 16;
+    let count3 = 0;
+    for (; ; ) {
+      i = skipSpace(src, i);
+      if (src.startsWith("</template>", i)) break;
+      const ruleStart = i;
+      const rule = readRule(src, i);
+      i = cursor;
+      sink.rule?.(rule, ruleStart, i);
+      count3 += 1;
+    }
+    if (count3 === 0) miss("an empty rules block", start);
+    i += 11;
+    sink.rules?.(start, i);
+    i = skipSpace(src, i);
   }
   return expect(src, i, "</table>");
 }
@@ -413,7 +580,8 @@ function gridModel(src, at) {
   scanGrid(src, at, {
     table: (table) => Object.assign(sheet, table),
     col: (col) => sheet.cols.push(col),
-    row: (row) => sheet.rows.push(row)
+    row: (row) => sheet.rows.push(row),
+    rule: (rule) => (sheet.rules ??= []).push(rule)
   });
   return sheet;
 }
@@ -449,13 +617,13 @@ function tabIndex(sheet) {
     frozenRows: sheet.rows.filter((row) => row.frozen).length
   };
 }
-function columnNumber(letters) {
+function columnNumber(letters2) {
   let n = 0;
-  for (const letter of letters) n = n * 26 + (letter.charCodeAt(0) - 64);
+  for (const letter of letters2) n = n * 26 + (letter.charCodeAt(0) - 64);
   return n;
 }
-function parseCell(text, range) {
-  const match = A1.exec(text);
+function parseCell(text2, range) {
+  const match = A1.exec(text2);
   const column = match ? columnNumber(match[1]) : 0;
   if (!match || column > MAX_COLUMN) {
     throw new QueryRefused("bad_range", `range ${JSON.stringify(range)} is not an A1 cell or rectangle such as B2 or A1:C3`);
@@ -499,11 +667,11 @@ var MAX_COUNT2 = 9999999;
 var domAdapter = {
   name: (node) => node.localName,
   attr: (node, name) => node.getAttribute(name),
-  children: (node) => Array.from(node.children),
+  children: (node) => Array.from(node.localName === "template" ? node.content.children : node.children),
   text: (node) => node.textContent
 };
 var has = (adapter, node, name) => adapter.attr(node, name) !== null;
-var cleanText = (text) => text.replace(/\r\n?/g, "\n").replace(/\0/g, "");
+var cleanText = (text2) => text2.replace(/\r\n?/g, "\n").replace(/\0/g, "");
 function count2(value, min) {
   if (value === null || !/^[0-9]{1,7}$/.test(value.trim())) return void 0;
   const n = Number(value.trim());
@@ -551,6 +719,31 @@ function colModel(adapter, node) {
   if (width) col.width = Number(width[1]);
   return col;
 }
+function ruleModel(adapter, node) {
+  const rule = {};
+  for (const key of ["id", "pos", "kind", "range"]) {
+    const value = adapter.attr(node, key === "id" || key === "pos" ? `data-${key}` : key);
+    if (value !== null) rule[key] = cleanText(value);
+  }
+  for (const field of RULE_FIELDS) {
+    if (RULE_FLAGS.has(field)) {
+      if (has(adapter, node, field)) rule[field] = true;
+      continue;
+    }
+    const value = adapter.attr(node, field);
+    if (value === null) continue;
+    if (field !== "items") {
+      rule[field] = cleanText(value);
+      continue;
+    }
+    try {
+      rule.items = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return ruleProblem(rule) === null ? rule : null;
+}
 function treeModel(adapter, table) {
   const sheet = { cols: [], rows: [] };
   const freezeCols = count2(adapter.attr(table, "freeze-cols"), 1);
@@ -569,6 +762,11 @@ function treeModel(adapter, table) {
       for (const tr of adapter.children(part)) if (adapter.name(tr) === "tr") into.push(rowModel(adapter, tr, name === "thead"));
     } else if (name === "tr") {
       data.push(rowModel(adapter, part, false));
+    } else if (name === "template" && has(adapter, part, "rules")) {
+      for (const node of adapter.children(part)) {
+        const rule = adapter.name(node) === "rule" ? ruleModel(adapter, node) : null;
+        if (rule !== null) (sheet.rules ??= []).push(rule);
+      }
     }
   }
   sheet.rows = [...frozen, ...data];
@@ -650,9 +848,9 @@ function content(value) {
   if (typeof value === "boolean") return { text: shown(value) };
   if (typeof value !== "string") throw new QueryRefused("bad_value", "a value is a number, true, false, text or null");
   if (value.includes("\0")) throw new QueryRefused("bad_value", "text holds a NUL character");
-  const text = value.replace(/\r\n?/g, "\n");
-  if (text.startsWith("=")) return { text: "", f: text };
-  return typed(text) === text || text === "" ? { text } : { text, t: true };
+  const text2 = value.replace(/\r\n?/g, "\n");
+  if (text2.startsWith("=")) return { text: "", f: text2 };
+  return typed(text2) === text2 || text2 === "" ? { text: text2 } : { text: text2, t: true };
 }
 function setCell(old, value) {
   const cell = { text: "", ...content(value) };
@@ -672,7 +870,10 @@ function readGrid(src) {
     },
     col: (col) => grid.cols.push(col),
     row: (row2, start, end) => grid.rows.push({ row: row2, start, end }),
-    group: (start, end, frozen) => grid.groups.push({ start, end, frozen, rows: 0 })
+    group: (start, end, frozen) => grid.groups.push({ start, end, frozen, rows: 0 }),
+    rules: (start) => {
+      grid.rulesAt = start;
+    }
   });
   grid.startEnd = src.indexOf(">") + 1;
   let row = 0;
@@ -755,17 +956,18 @@ function patchGrid(src, ops, { newId = randomId } = {}) {
   const { freezeCols } = grid.table;
   edits.push({ start: 0, end: grid.startEnd, bytes: `<table grid${freezeCols ? ` freeze-cols="${freezeCols}"` : ""}${stale ? " stale" : ""}>` });
   for (const [index, row] of edited) edits.push({ start: grid.rows[index].start, end: grid.rows[index].end, bytes: rowHtml(row) });
+  const tail = grid.rulesAt ?? grid.end - "</table>".length;
   if (appended.length > 0) {
     const last = grid.groups[grid.groups.length - 1];
     let room = last && !last.frozen ? GROUP_SIZE - last.rows : 0;
-    let at = last && !last.frozen ? last.end - "</tbody>".length : grid.end - "</table>".length;
+    let at = last && !last.frozen ? last.end - "</tbody>".length : tail;
     let rest = appended;
     if (room > 0) {
       edits.push({ start: at, end: at, bytes: rest.slice(0, room).map((row) => `${rowHtml(row)}
 `).join("") });
       rest = rest.slice(room);
     }
-    at = grid.end - "</table>".length;
+    at = tail;
     let bytes = "";
     for (let i = 0; i < rest.length; i += GROUP_SIZE) {
       bytes += `<tbody>
@@ -863,19 +1065,118 @@ function createSheetWriter({ groupSize = 50 } = {}) {
     }
     tab.groups = groups;
     tab.groupOf = groupOf;
-    return `${html}</table>`;
+    return `${html}${rulesHtml(sheet.rules)}</table>`;
   }
   return { table, touch };
+}
+
+// src/grid/codec/charts.js
+var MAX_DRAWING = 1048576;
+var ELEMENTS = /* @__PURE__ */ new Set(["svg", "g", "title", "desc", "rect", "line", "polyline", "polygon", "path", "circle", "ellipse", "text", "tspan"]);
+var TEXT_ONLY = /* @__PURE__ */ new Set(["title", "desc"]);
+var START = /<([a-z][a-zA-Z0-9]*)((?: [a-zA-Z_:][-a-zA-Z0-9_:.]*="[^"<]*")*)>/y;
+var END = /<\/([a-z][a-zA-Z0-9]*)>/y;
+var TEXT = /[^<]+/y;
+var ATTR = / ([a-zA-Z_:][-a-zA-Z0-9_:.]*)="([^"<]*)"/g;
+var ATTRIBUTES = /* @__PURE__ */ new Set([
+  "xmlns",
+  "viewBox",
+  "width",
+  "height",
+  "x",
+  "y",
+  "x1",
+  "y1",
+  "x2",
+  "y2",
+  "cx",
+  "cy",
+  "r",
+  "rx",
+  "ry",
+  "d",
+  "points",
+  "fill",
+  "fill-opacity",
+  "stroke",
+  "stroke-width",
+  "stroke-opacity",
+  "stroke-dasharray",
+  "stroke-linecap",
+  "stroke-linejoin",
+  "opacity",
+  "transform",
+  "text-anchor",
+  "dominant-baseline",
+  "font-family",
+  "font-size",
+  "font-weight",
+  "role",
+  "aria-label",
+  "aria-hidden"
+]);
+var ACTIVE_VALUE = /url\s*\(|\\|\/\*|&lt;|&gt;/i;
+var ENTITY = /&(?!(?:amp|lt|gt|quot|nbsp);)/;
+var LONE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+function drawingProblem(html) {
+  if (typeof html !== "string") return "a drawing is text";
+  if (html === "") return "a drawing is one <svg> element";
+  if (html.length > MAX_DRAWING) return `a drawing is at most ${MAX_DRAWING} characters`;
+  if (/[\r\0]/.test(html) || LONE.test(html)) return "a drawing holds a carriage return, NUL or half a character";
+  if (ENTITY.test(html)) return "a drawing writes & only as &amp;, &lt;, &gt;, &quot; or &nbsp;";
+  const open = [];
+  let at = 0;
+  while (at < html.length) {
+    if (at > 0 && open.length === 0) return "a drawing is one <svg> element with nothing after it";
+    START.lastIndex = at;
+    END.lastIndex = at;
+    TEXT.lastIndex = at;
+    let m;
+    if (m = START.exec(html)) {
+      const name = m[1];
+      if (!ELEMENTS.has(name)) return `a drawing holds <${name}>`;
+      if (name === "svg" !== (open.length === 0)) return "a drawing is one <svg> around everything else";
+      if (TEXT_ONLY.has(open.at(-1))) return `<${open.at(-1)}> holds text only`;
+      for (const [, attr2, value] of m[2].matchAll(ATTR)) {
+        if (!ATTRIBUTES.has(attr2)) return `a drawing holds the attribute ${attr2}`;
+        if (ACTIVE_VALUE.test(value)) return `a drawing holds ${attr2}="${value}"`;
+      }
+      open.push(name);
+      at = START.lastIndex;
+    } else if (m = END.exec(html)) {
+      if (open.at(-1) !== m[1]) return `a drawing closes <${m[1]}> where <${open.at(-1) ?? "nothing"}> is open`;
+      open.pop();
+      at = END.lastIndex;
+    } else if (m = TEXT.exec(html)) {
+      if (open.length === 0) return "a drawing is one <svg> element";
+      at = TEXT.lastIndex;
+    } else {
+      return `a drawing holds markup that is not a shape or text at ${at}`;
+    }
+  }
+  return open.length === 0 ? null : "a drawing leaves an element open";
+}
+var drawable = (drawing) => typeof drawing === "string" && drawing !== "" && drawingProblem(drawing) === null;
+var figureHtml = (id, drawing) => `<figure chart="${attrEscape(id).replaceAll("\xA0", "&nbsp;")}" sap-ignore="">${drawing}</figure>`;
+function chartsHtml(rules, drawingOf = () => void 0) {
+  let out = "";
+  for (const rule of rules ?? []) {
+    if (rule.kind !== "chart") continue;
+    const drawing = drawingOf(rule.id);
+    if (drawable(drawing)) out += `
+${figureHtml(rule.id, drawing)}`;
+  }
+  return out;
 }
 
 // src/grid/codec/digest.js
 var OFFSET = 2166136261;
 var PRIME = 16777619;
-function fnv1a(text, hash = OFFSET) {
+function fnv1a(text2, hash = OFFSET) {
   const step = (byte) => {
     hash = Math.imul(hash ^ byte, PRIME) >>> 0;
   };
-  for (const char of text) {
+  for (const char of text2) {
     let code = char.codePointAt(0);
     if (code >= 55296 && code <= 57343) code = 65533;
     if (code < 128) {
@@ -960,22 +1261,34 @@ function tabDigest(sheet) {
   return { cols: columnIds(sheet), rows: gridDigest(sheet) };
 }
 export {
+  CHART_TYPES,
   CodecMiss,
   MAX_DIGITS,
+  MAX_DRAWING,
   QueryRefused,
   RENDERS,
+  RULE_FIELDS,
+  RULE_FLAGS,
+  RULE_KINDS,
+  RULE_TESTS,
   STYLE_PROPERTIES,
   attrEscape,
+  byRule,
   canonicalGrid,
   cellHtml,
   cellInput,
   cellJson,
   cellValue,
+  chartBox,
+  chartsHtml,
   colHtml,
   columnIds,
+  copyRule,
   createSheetWriter,
   cutGrids,
   domAdapter,
+  drawingProblem,
+  figureHtml,
   filterStyle,
   fnv1a,
   gridDigest,
@@ -994,6 +1307,8 @@ export {
   rowChange,
   rowDigest,
   rowHtml,
+  ruleProblem,
+  sameRule,
   scanGrid,
   shown,
   significantDigits,

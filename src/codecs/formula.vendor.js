@@ -333,7 +333,7 @@ function parseExpr(state, minPower) {
     const power = BINARY[token.value];
     if (power === void 0 || power <= minPower) break;
     next(state);
-    const right = parseExpr(state, power);
+    const right = parseExpr(state, token.value === "^" ? power - 1 : power);
     left = {
       type: "binary",
       op: token.value,
@@ -616,7 +616,118 @@ function originalSlots(f, homeId, frame) {
   }
   return { skeleton: s.skeleton, keys: s.keys, nodes, refs, src: s.src };
 }
+function shiftRows(f, delta) {
+  if (delta === 0) return f;
+  const src = f.slice(1);
+  const parsed = parse(src);
+  if (parsed.error) return f;
+  let out = "";
+  let at = 0;
+  for (const node of parsed.refs) {
+    const text = src.slice(node.span[0], node.span[1]);
+    let moved = "";
+    let from = 0;
+    let dead = false;
+    for (const token of tokenize(text)) {
+      if (token.type !== "cell" && token.type !== "row") continue;
+      if (token.absRow || token.row === void 0 || token.row === null) continue;
+      const digits = /\d+$/.exec(text.slice(token.start, token.end));
+      if (digits === null) continue;
+      const row = token.row + delta;
+      if (row < 1) dead = true;
+      const end = token.end;
+      moved += text.slice(from, end - digits[0].length) + String(row);
+      from = end;
+    }
+    out += src.slice(at, node.span[0]) + (dead ? "#REF!" : moved + text.slice(from));
+    at = node.span[1];
+  }
+  return "=" + out + src.slice(at);
+}
+function topLeftOf(range) {
+  const parsed = parse(range);
+  const node = parsed.error ? null : parsed.refs[0];
+  if (!node) return { row: 0, col: 0 };
+  const ends = node.type === "ref" ? [node] : [node.from, node.to];
+  const rows = ends.map((end) => end.row).filter((row) => typeof row === "number");
+  const cols = ends.map((end) => end.col).filter((col) => typeof col === "string");
+  return { row: rows.length > 0 ? Math.min(...rows) - 1 : 0, col: cols.length > 0 ? Math.min(...cols.map(colIndex)) : 0 };
+}
+function areaOf(text) {
+  if (typeof text !== "string") return null;
+  const parsed = parse(text);
+  if (parsed.error || parsed.refs.length !== 1) return null;
+  const node = parsed.refs[0];
+  if (node.span[0] !== 0 || node.span[1] !== text.length) return null;
+  const ends = node.type === "ref" ? [node, node] : [node.from, node.to];
+  const rows = ends.map((end) => typeof end.row === "number" ? end.row - 1 : null);
+  const cols = ends.map((end) => typeof end.col === "string" ? colIndex(end.col) : null);
+  const area = {
+    sheet: node.sheet ?? null,
+    top: rows[0] === null ? 0 : Math.min(...rows.filter((row) => row !== null)),
+    bottom: rows.includes(null) ? null : Math.max(...rows),
+    left: cols[0] === null ? 0 : Math.min(...cols.filter((col) => col !== null)),
+    right: cols.includes(null) ? null : Math.max(...cols)
+  };
+  if (area.top < 0 || (area.bottom ?? 0) > 9999998 || (area.right ?? 0) > 16383 || area.left > 16383 || area.top > 9999998) return null;
+  return area;
+}
+function moveAnchored(f, homeId, before, after, rows, cols) {
+  const src = f.slice(1);
+  const parsed = parse(src);
+  if (parsed.error) return f;
+  const place = (ids, at2, index) => index >= ids.length ? index : at2.get(ids[index]) ?? -1;
+  let out = "";
+  let at = 0;
+  for (const node of parsed.refs) {
+    const text = src.slice(node.span[0], node.span[1]);
+    const was = node.sheet === null ? before.get(homeId) : byName(before, node.sheet);
+    const now = was ? after.get(was.id) : null;
+    let moved = "";
+    let from = 0;
+    let dead = false;
+    if (was && now) {
+      for (const token of tokenize(text)) {
+        if (token.type !== "cell" && token.type !== "row" && token.type !== "col") continue;
+        const raw = text.slice(token.start, token.end);
+        const hasCol = token.type !== "row";
+        const hasRow = token.type !== "col";
+        const digits = hasRow ? /\d+$/.exec(raw)[0] : "";
+        const length = (hasCol ? (token.absCol ? 1 : 0) + token.col.length : 0) + (hasRow ? (token.absRow ? 1 : 0) + digits.length : 0);
+        const c = hasCol ? token.absCol ? place(was.cols, now.colAt, colIndex(token.col)) : colIndex(token.col) + cols : 0;
+        const r = hasRow ? token.absRow ? place(was.rows, now.rowAt, token.row - 1) : token.row - 1 + rows : 0;
+        if (c < 0 || r < 0) dead = true;
+        const coord = (hasCol ? `${token.absCol ? "$" : ""}${colText(Math.max(c, 0))}` : "") + (hasRow ? `${token.absRow ? "$" : ""}${r + 1}` : "");
+        moved += text.slice(from, token.end - length) + coord;
+        from = token.end;
+      }
+    }
+    out += src.slice(at, node.span[0]) + (dead ? "#REF!" : moved + text.slice(from));
+    at = node.span[1];
+  }
+  return "=" + out + src.slice(at);
+}
+function meaning(f, homeId, frame) {
+  const bound = bind(f, homeId, frame);
+  if (bound === null) return `!${f}`;
+  const src = f.slice(1);
+  let out = "";
+  let at = 0;
+  bound.parsed.refs.forEach((node, i) => {
+    const ref = bound.refs[i];
+    const from = node.type === "ref" ? node : node.from;
+    const to = node.type === "ref" ? node : node.to;
+    const end = (id, typed) => id === void 0 ? `~${typed}` : id === null ? "" : id;
+    const corners = ref.unbound ? [`~${ref.name.toLowerCase()}`, ...[from.row ?? "", to.row ?? ""].sort(), ...[from.col ?? "", to.col ?? ""].sort()] : [ref.s, ...[end(ref.r0, from.row), end(ref.r1, to.row)].sort(), ...[end(ref.c0, from.col), end(ref.c1, to.col)].sort()];
+    const lock = (one) => `${one.absCol ? "$" : ""}:${one.absRow ? "$" : ""}`;
+    const key = [node.type, ...corners, ...[lock(from), lock(to)].sort()].join("|");
+    out += src.slice(at, node.span[0]) + `${key}`;
+    at = node.span[1];
+  });
+  return out + src.slice(at);
+}
 export {
+  areaOf,
   bind,
   cornersUnordered,
   frameFrom,
@@ -624,11 +735,15 @@ export {
   idForm,
   idsOf,
   lossy,
+  meaning,
+  moveAnchored,
   originalSlots,
   parse,
   print,
   restoreSlots,
+  shiftRows,
   slotsOf,
   standard,
-  tokenize
+  tokenize,
+  topLeftOf
 };
