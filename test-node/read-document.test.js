@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import * as cheerio from 'cheerio'
 import { readDocument } from '../src/read.js'
+import { writeDocument } from '../src/write.js'
 import { sheet } from '../src/codecs/sheet.js'
 
 const table = (name) => readFileSync(new URL(`./fixtures/sheet/${name}.html`, import.meta.url), 'utf8').trimEnd()
@@ -121,10 +122,10 @@ test('a document forging a hole cannot inject one', () => {
 })
 
 test('a document with no rules tag, and a version 1 document', () => {
-  assert.deepEqual(read('<p>x</p>' + table('tiny')), { data: null, version: null, fast: true })
+  assert.deepEqual(read('<p>x</p>' + table('tiny')), { data: null, version: null, fast: true, stale: false })
   assert.deepEqual(
     read('<html><head><script type="application/json" data-rules-name="api" data-rules-version="1">{"t":"h1"}</script></head><body><h1>Hi</h1></body></html>'),
-    { data: { t: 'Hi' }, version: '1', fast: true },
+    { data: { t: 'Hi' }, version: '1', fast: true, stale: false },
   )
 })
 
@@ -164,4 +165,11 @@ test('documentRules finds the same rules tag as a full parse, on every conforman
   }
   assert.ok(compared > 150, `compared ${compared}`)
   assert.ok(cut > 50, `pages with grids ${cut}`)
+})
+
+test('a read of a file with the stale mark says stale; without it, not', () => {
+  const src = '<!doctype html><html><head><title>t</title></head><body><form><input id="a" value="1"><output id="sum">1</output></form><script type="application/json" data-rules-name="api" data-rules-version="1">{"a":"#a@value","sum":"#sum"}</script></body></html>'
+  const written = writeDocument(cheerio.load, src, { a: '5' })
+  assert.equal(read(written.html).stale, true)
+  assert.equal(read(src).stale, false)
 })

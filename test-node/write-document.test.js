@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import * as cheerio from 'cheerio'
-import { writeDocument } from '../src/write.js'
+import { writeDocument, STALE_MARK } from '../src/write.js'
 import { apply, extract, findRulesIn } from '../src/engine/index.js'
 import cheerioAdapter from '../src/adapters/cheerio.js'
 import { NoRulesTag, RulesParseError, WriteRejected, WriteRefused } from '../src/engine/errors.js'
@@ -217,4 +217,64 @@ test('a caller rules value that is not a selector, array or object is rejected',
 
 test('a document with no rules tag and no caller rules is still rejected', () => {
   assert.throws(() => writeDocument(load, PLAIN, { title: 'World' }), NoRulesTag)
+})
+
+const STALE_SRC = '<!doctype html><html><head><title>t</title></head><body><form><input id="a" value="1"><output id="sum">1</output></form><script type="application/json" data-rules-name="api" data-rules-version="1">{"a":"#a@value","sum":"#sum"}</script></body></html>'
+const FORM = '<form><input id="a" value="1"><output id="sum">1</output></form><script type="application/json" data-rules-name="api" data-rules-version="1">{"a":"#a@value","sum":"#sum"}</script>'
+const SHEET_SRC = '<!doctype html><html><body><h1>Book</h1><section data-tab data-id="s1" data-name="Sheet1"><table grid><colgroup><col data-id="c1"></colgroup><tbody><tr data-id="r1"><td>2</td></tr><tr data-id="r2"><td f="=A1*2">4</td></tr></tbody></table></section>\n<script type="application/json" data-rules-name="api" data-rules-version="2">{"title":"h1","sheets":"[data-tab]@codec(sheet)"}</script>\n</body></html>\n'
+
+const marks = (html) => html.split(STALE_MARK).length - 1
+
+test('a write that changes an input of a computed document leaves one stale mark in its head', () => {
+  const result = writeDocument(load, STALE_SRC, { a: '5' })
+  assert.equal(result.stale, true)
+  assert.equal(marks(result.html), 1)
+  assert.ok(result.html.includes('<title>t</title><meta name="clay-stale" clay="no-save"></head>'), result.html)
+})
+
+test('a second write leaves one mark', () => {
+  const first = writeDocument(load, STALE_SRC, { a: '5' })
+  const second = writeDocument(load, first.html, { a: '6' })
+  assert.equal(second.changed, true)
+  assert.equal(marks(second.html), 1)
+})
+
+test('a write that changes nothing adds no mark', () => {
+  const result = writeDocument(load, STALE_SRC, { a: '1' })
+  assert.equal(result.changed, false)
+  assert.equal(marks(result.html), 0)
+})
+
+test('a plain document gets no mark', () => {
+  const src = '<!doctype html><html><head><title>t</title></head><body><form><input id="a" value="1"></form><script type="application/json" data-rules-name="api" data-rules-version="1">{"a":"#a@value"}</script></body></html>'
+  const result = writeDocument(load, src, { a: '5' })
+  assert.equal(result.stale, false)
+  assert.equal(marks(result.html), 0)
+})
+
+test('a document with a body and no head tag gets the mark in a head before the body', () => {
+  const result = writeDocument(load, '<!doctype html><html><body>' + FORM + '</body></html>', { a: '5' })
+  assert.ok(result.html.includes('<html><head><meta name="clay-stale" clay="no-save"></head><body>'), result.html)
+})
+
+test('a </head> inside raw text in the head is not where the mark goes', () => {
+  const src = '<!doctype html><html><head><title>a</head>b</title></head><body>' + FORM + '</body></html>'
+  const result = writeDocument(load, src, { a: '5' })
+  assert.ok(result.html.includes('<title>a</head>b</title><meta name="clay-stale" clay="no-save"></head>'), result.html)
+  assert.equal(marks(result.html), 1)
+})
+
+test('a write to a document whose only computed values are a sheet\'s adds no mark', () => {
+  const result = writeDocument(load, SHEET_SRC, { title: 'Budget' }, { token: 'api' })
+  assert.equal(result.stale, true)
+  assert.equal(result.changed, true)
+  assert.equal(marks(result.html), 0)
+})
+
+// Bug guarded: parse5 reads a leading byte order mark as text, so the JS writer found
+// no head and left the file unmarked while HTML Clay's Go port marked it.
+test('a file that starts with a byte order mark still gets the mark in its head', () => {
+  const result = writeDocument(load, '\ufeff' + STALE_SRC, { a: '5' })
+  assert.ok(result.html.startsWith('\ufeff<!doctype html>'))
+  assert.ok(result.html.includes('<title>t</title><meta name="clay-stale" clay="no-save"></head>'))
 })

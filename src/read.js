@@ -5,6 +5,7 @@ import { codecOf } from './engine/rule-syntax.js'
 import { sheet } from './codecs/sheet.js'
 import { checkCodecRules } from './engine/codecs.js'
 import { holeMarker, QueryRefused } from './codecs/sheet.vendor.js'
+import { hasStaleMark } from './stale-mark.js'
 
 // The URL parameters a host passes to readDocument as `query`, from a
 // URLSearchParams. Returns null when none of them is present (a whole read,
@@ -30,8 +31,9 @@ export function parseSheetQuery(params) {
 
 // Reads a document's data through its rules tag, from source. `load` is
 // cheerio.load, passed in so this package keeps cheerio out of its browser
-// bundles. Returns { data, version, fast }; data is null when no rules tag
-// carries `token`.
+// bundles. Returns { data, version, fast, stale }; stale is true when the source
+// carries the stale mark (src/stale-mark.js): a data write changed it and no page
+// has recalculated since. data is null when no rules tag carries `token`.
 //
 // A codec with cut() lets a host skip parsing its regions: the source is cut,
 // only the rest is parsed, and each hole hands the codec its region's bytes.
@@ -60,7 +62,7 @@ export function readDocument(load, src, options = {}) {
       const root = $.root()
       const found = findRulesIn(cheerioAdapter, root, token)
       const fast = countGrids(rest) === regions.length
-      if (!found) return { data: null, version: null, fast }
+      if (!found) return { data: null, version: null, fast, stale: hasStaleMark(src) }
       if (codec === sheet && readHolesHold($, root, found.rules, name, marker, regions.length)) {
         const region = (table) => regionBytes(table, src, marker, regions)
         const opts = { ...call, version: found.version, region }
@@ -72,7 +74,7 @@ export function readDocument(load, src, options = {}) {
           const context = codec ? root : (tree ??= load(src).root())
           data[key] = extract(cheerioAdapter, context, { [key]: rule }, { ...opts, region: codec ? region : undefined })[key]
         }
-        return { data, version: found.version, fast }
+        return { data, version: found.version, fast, stale: hasStaleMark(src) }
       }
     }
   }
@@ -81,8 +83,8 @@ export function readDocument(load, src, options = {}) {
 
   const root = load(src).root()
   const found = findRulesIn(cheerioAdapter, root, token)
-  if (!found) return { data: null, version: null, fast }
-  return { data: extract(cheerioAdapter, root, found.rules, { ...call, version: found.version }), version: found.version, fast }
+  if (!found) return { data: null, version: null, fast, stale: hasStaleMark(src) }
+  return { data: extract(cheerioAdapter, root, found.rules, { ...call, version: found.version }), version: found.version, fast, stale: hasStaleMark(src) }
 }
 
 // A document's rules tag as { rules, version }, or null when no tag carries
@@ -163,3 +165,4 @@ function regionBytes(table, src, marker, regions) {
 }
 
 export { hasComputedRules } from './computed.js'
+export { STALE_MARK, hasStaleMark } from './stale-mark.js'

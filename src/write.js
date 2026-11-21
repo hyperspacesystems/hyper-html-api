@@ -10,14 +10,17 @@ import { trackAdapter, spliceDocument } from './engine/splice.js'
 import { NoRulesTag, RulesParseError, WriteRejected } from './engine/errors.js'
 import { sheet } from './codecs/sheet.js'
 import { codecOf } from './engine/rule-syntax.js'
+import { withStaleMark } from './stale-mark.js'
 
 // Applies a JSON body to a document's source through caller-provided rules
 // (options.rules) or the document's own rules tag, under the content-only
 // policy. `load` is cheerio.load, passed in so this package keeps cheerio out
 // of its browser bundles. Returns { html, changed, spliced, stale }: `stale` is
 // true when a rule reads a computed value (src/computed.js), which this write
-// did not recalculate. A top level `__meta__` key in the body is a host's answer
-// posted back, dropped unless the rules define it.
+// did not recalculate. When it is true for a value other than a sheet's and the
+// write changed the bytes, the returned html also carries the stale mark
+// (src/stale-mark.js) in its head. A top level `__meta__` key in the body is a
+// host's answer posted back, dropped unless the rules define it.
 // Throws NoRulesTag, RulesParseError, WriteRejected, WriteRefused, ShapeMismatch,
 // EmptyListInsert, UnknownCodec or WriteNotRoundTripped, always before producing
 // any output. options.codecs maps a name to a codec for `@codec(name)` rules,
@@ -61,7 +64,10 @@ export function writeDocument(load, src, data, options = {}) {
   const written = writtenRules(rules, data)
   const writtenRoot = load(html).root()
   assertRoundTrip(written, data, extract(cheerioAdapter, writtenRoot, written, { ...opts, allMatches: true }), codecs)
-  return { html, changed: html !== src, spliced, stale: hasComputedRules(cheerioAdapter, writtenRoot, rules, opts) }
+  const stale = hasComputedRules(cheerioAdapter, writtenRoot, rules, opts)
+  const marked = html !== src && stale && hasComputedRules(cheerioAdapter, writtenRoot, rules, { ...opts, sheets: false })
+  const out = marked ? withStaleMark(load, html) : html
+  return { html: out, changed: out !== src, spliced, stale }
 }
 
 // The top-level subset of `rules` that the payload names, which is exactly what
@@ -82,6 +88,7 @@ function isPlainObject(value) {
 
 export { patchDocument, NOT_CANONICAL_MESSAGE } from './patch-document.js'
 export { hasComputedRules } from './computed.js'
+export { STALE_MARK, hasStaleMark } from './stale-mark.js'
 
 // The one rule every host uses to tell a patch body from a data write: an
 // object whose `patch` value is an array and whose only other key is

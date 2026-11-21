@@ -8,6 +8,9 @@
 // sap-ignore subtree, as sapjs/src/ownership.js decides); or when a sheet rule's
 // table holds a formula or a `stale` mark. Nothing runs: only rules and markup are
 // read, so a page whose script only touches its own editor UI is not computed.
+//
+// opts.sheets === false leaves sheet tables out: a host uses it to decide the
+// stale mark, which never marks a value only a sheet computes.
 
 import { codecOf, splitRule, ruleAttrIndex } from './engine/rule-syntax.js'
 import { isCustomPropertyName } from './engine/style-vars.js'
@@ -104,6 +107,7 @@ function paintsText(adapter, node) {
 }
 
 function sheetComputed(adapter, node, opts) {
+  if (opts.sheets === false) return false
   const found = adapter.matches(node, 'table[grid]') ? [node] : findAll(adapter, node, 'table[grid]', opts)
   const tables = found.filter((table) => !insideInert(adapter, table))
   return tables.some((table) => adapter.attr(table, 'stale') !== null || findAll(adapter, table, 'td[f], th[f]', opts).length > 0)
