@@ -134,6 +134,11 @@
 
 ## [Unreleased]
 
+## [0.17.1] - 2026-11-23
+
+### Changed
+- No user-facing changes.
+
 ## [0.17.0] - 2026-11-20
 
 ### Added
